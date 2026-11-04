@@ -1,5 +1,10 @@
 package my.edu.utar.p1_kang_kah_yi_2302786;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.database.sqlite.SQLiteException;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -8,14 +13,23 @@ import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.view.Window;
-import android.widget.Button;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.EditText;
+import android.widget.ScrollView;
+import android.widget.Toast;
+import android.widget.ImageButton;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import androidx.appcompat.widget.SwitchCompat;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -115,14 +129,34 @@ public class MainActivity extends AppCompatActivity {
     );
 
     private enum GameState {
-        PLAYING, PAUSED, LEVEL_COMPLETE, GAME_OVER
+        INTRO, PLAYING, PAUSED, LEVEL_COMPLETE, GAME_OVER
     }
 
     private TextView levelText;
+    private TextView scoreLabel;
     private TextView scoreText;
     private TextView timerText;
     private GridLayout gameGrid;
-    private Button pauseButton;
+    private FrameLayout boardContainer;
+    private ImageButton pauseButton;
+    private ImageButton settingsButton;
+    private FrameLayout timerTrack;
+    private View timerFill;
+    private GradientDrawable timerFillDrawable;
+
+    private FrameLayout introOverlay;
+    private TextView introTitle;
+    private TextView introNumber;
+    private TextView introHint;
+    private final Handler introHandler = new Handler(Looper.getMainLooper());
+    private Runnable introRunnable;
+    private boolean introRestartOnResume = false;
+
+    private SharedPreferences preferences;
+    private ScoreDatabaseHelper scoreDatabase;
+    private static final String PREFS_NAME = "tap_target_settings";
+    private static final String PREF_MUSIC = "music_enabled";
+    private static final String PREF_SFX = "sfx_enabled";
 
     private final List<TextView> tiles = new ArrayList<>();
     private final Random random = new Random();
@@ -145,12 +179,36 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         levelText = findViewById(R.id.levelText);
+        scoreLabel = findViewById(R.id.scoreLabel);
         scoreText = findViewById(R.id.scoreText);
         timerText = findViewById(R.id.timerText);
         gameGrid = findViewById(R.id.gameGrid);
+        boardContainer = findViewById(R.id.boardContainer);
         pauseButton = findViewById(R.id.pauseButton);
+        settingsButton = findViewById(R.id.settingsButton);
+        timerTrack = findViewById(R.id.timerTrack);
+        timerFill = findViewById(R.id.timerFill);
+        introOverlay = findViewById(R.id.introOverlay);
+        introTitle = findViewById(R.id.introTitle);
+        introNumber = findViewById(R.id.introNumber);
+        introHint = findViewById(R.id.introHint);
+        preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        scoreDatabase = new ScoreDatabaseHelper(this);
+
+        // Centered level + score badges; no dividers or surrounding board panel.
+        levelText.setBackground(roundedBackground(Color.parseColor("#E8EEF8"), 0, 50));
+        scoreLabel.setBackground(roundedBackground(Color.parseColor("#E8EEF8"), 0, 50));
+        // Keep the board transparent so the tiles sit directly on the page.
+        boardContainer.setBackgroundColor(Color.TRANSPARENT);
+        timerTrack.setBackground(roundedBackground(Color.parseColor("#E2E8F0"), 0, 30));
+        timerFillDrawable = roundedBackground(Color.parseColor("#2563EB"), 0, 30);
+        timerFill.setBackground(timerFillDrawable);
+        styleHeaderButton(pauseButton);
+        styleHeaderButton(settingsButton);
 
         pauseButton.setOnClickListener(v -> pauseLevel());
+        settingsButton.setOnClickListener(v -> showSettingsDialog());
+        timerTrack.post(this::updateTimerProgress);
         startNewGame();
     }
 
@@ -160,25 +218,82 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startLevel(int newIndex) {
+        stopIntroCountdown();
         stopCountdown();
         levelIndex = newIndex;
         LevelConfig config = levels.get(levelIndex);
         timeRemainingMs = config.durationMs;
         currentColorPair = config.colorPairs[random.nextInt(config.colorPairs.length)];
         highlightedIndex = -1;
-        state = GameState.PLAYING;
-        pauseButton.setEnabled(true);
+        // Only Level 1 needs the special "Are You Ready?" introduction.
+        boolean firstLevel = newIndex == 0;
+        state = firstLevel ? GameState.INTRO : GameState.PLAYING;
+        pauseButton.setEnabled(!firstLevel);
+        settingsButton.setEnabled(!firstLevel);
+        introOverlay.setVisibility(firstLevel ? View.VISIBLE : View.GONE);
         gameGrid.removeAllViews();
         tiles.clear();
         updateHeader();
 
-        // Wait for GridLayout to be measured before calculating square tile sizes.
-        gameGrid.post(() -> {
-            if (state != GameState.PLAYING || levelIndex != newIndex) return;
-            createGrid(levels.get(levelIndex).gridSize);
+        boardContainer.post(() -> {
+            if (levelIndex != newIndex ||
+                    (state != GameState.INTRO && state != GameState.PLAYING)) return;
+            createGrid(config.gridSize);
             highlightRandomTile();
-            startCountdown();
+            if (firstLevel) {
+                startIntroCountdown();
+            } else {
+                startCountdown();
+            }
         });
+    }
+
+    // A short countdown before Level 1 only. The five-second gameplay
+    // timer does not begin until the "START!" message disappears.
+    private void startIntroCountdown() {
+        stopIntroCountdown();
+        if (state != GameState.INTRO) return;
+        introOverlay.setVisibility(View.VISIBLE);
+        showIntroStep(0);
+    }
+
+    private void showIntroStep(int step) {
+        if (state != GameState.INTRO || isFinishing() || isDestroyed()) return;
+        if (step >= 5) {
+            introOverlay.setVisibility(View.GONE);
+            introRunnable = null;
+            state = GameState.PLAYING;
+            startCountdown();
+            return;
+        }
+
+        final String[] messages = {"READY", "3", "2", "1", "START!"};
+        introTitle.setText(step == 0 ? "ARE YOU READY!" :
+                (step == 4 ? "LET'S GO!" : "GET READY"));
+        introNumber.setText(messages[step]);
+        introNumber.setTextColor(Color.parseColor(step == 4 ? "#16A34A" : "#2563EB"));
+        introHint.setText(step == 0
+                ? "Find the tile with a different shade."
+                : step == 4 ? "Tap as fast as you can!" : "Focus on the colors");
+
+        // Subtle pop animation to distinguish each countdown number.
+        introNumber.animate().cancel();
+        introNumber.setAlpha(0.25f);
+        introNumber.setScaleX(1.25f);
+        introNumber.setScaleY(1.25f);
+        introNumber.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240).start();
+
+        long displayMs = (step == 0 || step == 4) ? 650L : 1000L;
+        introRunnable = () -> showIntroStep(step + 1);
+        introHandler.postDelayed(introRunnable, displayMs);
+    }
+
+    private void stopIntroCountdown() {
+        if (introRunnable != null) {
+            introHandler.removeCallbacks(introRunnable);
+            introRunnable = null;
+        }
+        if (introNumber != null) introNumber.animate().cancel();
     }
 
     private void createGrid(int size) {
@@ -189,10 +304,14 @@ public class MainActivity extends AppCompatActivity {
 
         // Use smaller gaps for larger boards so 6x6 through 9x9 fit the screen.
         int margin = size >= 6 ? dp(1) : dp(2);
-        int boardWidth = gameGrid.getWidth();
-
-        // Avoid a fixed minimum tile size, which could make Level 8 overflow.
-        int tileSize = Math.max(1, (boardWidth - size * margin * 2) / size);
+        // Fit the square board into BOTH available width and height.
+        // This leaves room for the new top toolbar and countdown bar.
+        int boardWidth = boardContainer.getWidth()
+                - boardContainer.getPaddingLeft() - boardContainer.getPaddingRight();
+        int boardHeight = boardContainer.getHeight()
+                - boardContainer.getPaddingTop() - boardContainer.getPaddingBottom();
+        int available = Math.max(1, Math.min(boardWidth, boardHeight));
+        int tileSize = Math.max(1, (available - size * margin * 2) / size);
 
         for (int index = 0; index < size * size; index++) {
             final int tileIndex = index;
@@ -260,7 +379,10 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         countdownStarted = true;
+        pauseButton.setEnabled(true);
+        settingsButton.setEnabled(true);
         deadlineMs = SystemClock.elapsedRealtime() + timeRemainingMs;
+        updateHeader();
         countdown = new CountDownTimer(timeRemainingMs, 50L) {
             @Override
             public void onTick(long millisUntilFinished) {
@@ -294,6 +416,7 @@ public class MainActivity extends AppCompatActivity {
         }
         state = GameState.PAUSED;
         pauseButton.setEnabled(false);
+        settingsButton.setEnabled(false);
         updateHeader();
         showPauseDialog();
     }
@@ -301,7 +424,6 @@ public class MainActivity extends AppCompatActivity {
     private void resumeLevel() {
         if (state != GameState.PAUSED) return;
         state = GameState.PLAYING;
-        pauseButton.setEnabled(true);
         startCountdown(); // Continue with remaining time, not a fresh 5 seconds.
     }
 
@@ -325,6 +447,7 @@ public class MainActivity extends AppCompatActivity {
         timeRemainingMs = 0L;
         state = GameState.LEVEL_COMPLETE;
         pauseButton.setEnabled(false);
+        settingsButton.setEnabled(false);
         updateHeader();
         showLevelCompleteDialog();
     }
@@ -344,7 +467,8 @@ public class MainActivity extends AppCompatActivity {
                 lastLevel ? "Finish game" : "Next level",
                 () -> {
                     if (lastLevel) {
-                        confirmEndGame(this::showLevelCompleteDialog);
+                        // Level 8 was completed naturally: no exit confirmation needed.
+                        endGame();
                     } else {
                         startLevel(levelIndex + 1);
                     }
@@ -371,9 +495,8 @@ public class MainActivity extends AppCompatActivity {
         stopCountdown();
         state = GameState.GAME_OVER;
         pauseButton.setEnabled(false);
+        settingsButton.setEnabled(false);
 
-        // NEXT PHASE: check Top 25 qualification, save the name and score,
-        // and open the leaderboard from here.
         showStyledDialog(
                 "★", "RUN COMPLETE", "Game over",
                 "Nice effort! You reached Level " + (levelIndex + 1) + ".",
@@ -381,9 +504,341 @@ public class MainActivity extends AppCompatActivity {
                 new String[]{"LEVEL REACHED", "FINAL SCORE"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore)},
-                "Play again", this::startNewGame,
-                "Close game", this::finish, false
+                "View results", this::showPostGameResults,
+                "Play again", this::startNewGame, false
         );
+    }
+
+    // Leaderboard flow: qualified -> name entry -> saved -> Top 25 table.
+    // Unqualified scores still lead to the Top 25 table, without a name prompt.
+    private void showPostGameResults() {
+        try {
+            if (scoreDatabase.qualifies(totalScore)) {
+                showNameEntryDialog();
+            } else {
+                showLeaderboardDialog();
+            }
+        } catch (SQLiteException error) {
+            Toast.makeText(this, "Unable to read scores. Please try again.",
+                    Toast.LENGTH_LONG).show();
+            showLeaderboardErrorDialog();
+        }
+    }
+
+    private void showNameEntryDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(22), dp(24), dp(22), dp(22));
+        card.setBackground(roundedBackground(Color.WHITE, 0, 24));
+
+        TextView title = makeText("🏆  TOP 25 SCORE!", 21,
+                Color.parseColor("#0F172A"), true);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title, fullWidth());
+
+        TextView subtitle = makeText("Your score of " + totalScore
+                        + " qualifies! Enter a name to save it on this device.",
+                14, Color.parseColor("#64748B"), false);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleParams = fullWidth();
+        subtitleParams.topMargin = dp(10);
+        card.addView(subtitle, subtitleParams);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setSingleLine(true);
+        nameInput.setHint("Your name");
+        nameInput.setTextSize(16);
+        nameInput.setTextColor(Color.parseColor("#0F172A"));
+        nameInput.setHintTextColor(Color.parseColor("#94A3B8"));
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT |
+                InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(20)});
+        nameInput.setBackground(roundedBackground(Color.parseColor("#F8FAFC"),
+                Color.parseColor("#CBD5E1"), 12));
+        nameInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout.LayoutParams inputParams = fullWidth();
+        inputParams.topMargin = dp(22);
+        card.addView(nameInput, inputParams);
+
+        TextView helper = makeText("Up to 20 characters · Names cannot be blank",
+                12, Color.parseColor("#64748B"), false);
+        LinearLayout.LayoutParams helperParams = fullWidth();
+        helperParams.topMargin = dp(8);
+        card.addView(helper, helperParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card).setCancelable(false).create();
+
+        TextView save = makeDialogButton("Save score", true, false);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        saveParams.topMargin = dp(20);
+        card.addView(save, saveParams);
+        save.setOnClickListener(v -> {
+            String name = nameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                nameInput.setError("Please enter your name");
+                nameInput.requestFocus();
+                return;
+            }
+            try {
+                if (!scoreDatabase.insertIfQualified(name, totalScore)) {
+                    Toast.makeText(this, "Score did not qualify for Top 25.",
+                            Toast.LENGTH_SHORT).show();
+                }
+                dialog.dismiss();
+                showLeaderboardDialog();
+            } catch (SQLiteException error) {
+                nameInput.setError("Could not save score. Please try again.");
+            }
+        });
+
+        TextView skip = makeDialogButton("Skip saving", false, false);
+        LinearLayout.LayoutParams skipParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        skipParams.topMargin = dp(9);
+        card.addView(skip, skipParams);
+        skip.setOnClickListener(v -> {
+            dialog.dismiss();
+            showLeaderboardDialog();
+        });
+        displayDialog(dialog);
+    }
+
+    private void showLeaderboardDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        final List<ScoreDatabaseHelper.ScoreEntry> entries;
+        try {
+            entries = scoreDatabase.getTop25();
+        } catch (SQLiteException error) {
+            showLeaderboardErrorDialog();
+            return;
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(20), dp(18), dp(20));
+        card.setBackground(roundedBackground(Color.WHITE, 0, 24));
+
+        TextView title = makeText("🏆  TOP 25 SCORES", 21,
+                Color.parseColor("#0F172A"), true);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title, fullWidth());
+
+        TextView subtitle = makeText("Highest scores saved on this phone",
+                12, Color.parseColor("#64748B"), false);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subParams = fullWidth();
+        subParams.topMargin = dp(6);
+        card.addView(subtitle, subParams);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(true);
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Math.min(dp(390), (int) (getResources().getDisplayMetrics().heightPixels * 0.46f)));
+        scrollParams.topMargin = dp(15);
+        card.addView(scroll, scrollParams);
+
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(rows, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (entries.isEmpty()) {
+            TextView empty = makeText("No scores yet. Play a round to set a record!",
+                    14, Color.parseColor("#64748B"), false);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(18), dp(30), dp(18), dp(30));
+            rows.addView(empty, fullWidth());
+        } else {
+            for (int i = 0; i < entries.size(); i++) {
+                ScoreDatabaseHelper.ScoreEntry score = entries.get(i);
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(11), dp(12), dp(11), dp(12));
+                row.setBackground(roundedBackground(
+                        i % 2 == 0 ? Color.parseColor("#F1F5F9") : Color.WHITE,
+                        0, 10));
+
+                TextView rank = makeText(String.format(Locale.US, "%02d", i + 1),
+                        13, Color.parseColor("#2563EB"), true);
+                row.addView(rank, new LinearLayout.LayoutParams(dp(35),
+                        ViewGroup.LayoutParams.WRAP_CONTENT));
+
+                TextView name = makeText(score.name, 14,
+                        Color.parseColor("#0F172A"), false);
+                name.setSingleLine(true);
+                name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                row.addView(name, new LinearLayout.LayoutParams(0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+                TextView points = makeText(String.valueOf(score.score), 16,
+                        Color.parseColor("#0F172A"), true);
+                points.setGravity(Gravity.END);
+                row.addView(points, new LinearLayout.LayoutParams(dp(65),
+                        ViewGroup.LayoutParams.WRAP_CONTENT));
+
+                LinearLayout.LayoutParams rowParams = fullWidth();
+                rowParams.bottomMargin = dp(4);
+                rows.addView(row, rowParams);
+            }
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card).setCancelable(false).create();
+
+        TextView playAgain = makeDialogButton("Play again", true, false);
+        LinearLayout.LayoutParams playAgainParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        playAgainParams.topMargin = dp(18);
+        card.addView(playAgain, playAgainParams);
+        playAgain.setOnClickListener(v -> {
+            dialog.dismiss();
+            startNewGame();
+        });
+
+        TextView close = makeDialogButton("Close game", false, false);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        closeParams.topMargin = dp(8);
+        card.addView(close, closeParams);
+        close.setOnClickListener(v -> {
+            dialog.dismiss();
+            finish();
+        });
+        displayDialog(dialog);
+    }
+
+    private void showLeaderboardErrorDialog() {
+        showStyledDialog("!", "SCORE ERROR", "Couldn't load scores",
+                "Your game score hasn't been saved. You can retry opening the leaderboard.",
+                Color.parseColor("#DC2626"), Color.parseColor("#FEE2E2"),
+                new String[]{"CURRENT SCORE"}, new String[]{String.valueOf(totalScore)},
+                "Try again", this::showPostGameResults,
+                "Play again", this::startNewGame, false);
+    }
+
+    // SETTINGS: choices are saved now, but music/sound playback will be
+    // connected to these booleans in a future enhancement.
+    private void showSettingsDialog() {
+        if (state != GameState.PLAYING || !countdownStarted) return;
+
+        timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
+        stopCountdown();
+        if (timeRemainingMs == 0L) {
+            completeLevel();
+            return;
+        }
+        state = GameState.PAUSED;
+        pauseButton.setEnabled(false);
+        settingsButton.setEnabled(false);
+        updateHeader();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(22), dp(24), dp(22), dp(22));
+        card.setBackground(roundedBackground(Color.WHITE, 0, 24));
+
+        TextView heading = makeText("GAME SETTINGS", 23, Color.parseColor("#0F172A"), true);
+        card.addView(heading, fullWidth());
+
+        TextView description = makeText(
+                "Personalize your game. Audio will be implemented in a future update.",
+                13, Color.parseColor("#64748B"), false);
+        description.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams descriptionParams = fullWidth();
+        descriptionParams.topMargin = dp(10);
+        card.addView(description, descriptionParams);
+
+        addSettingsSwitch(card, "Music", "Save music preference for a future update", PREF_MUSIC);
+        addSettingsSwitch(card, "Sound effects", "Save effects preference for a future update", PREF_SFX);
+
+        TextView note = makeText("Your game is paused while settings are open.",
+                12, Color.parseColor("#64748B"), false);
+        LinearLayout.LayoutParams noteParams = fullWidth();
+        noteParams.topMargin = dp(20);
+        card.addView(note, noteParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card)
+                .setCancelable(false)
+                .create();
+        dialog.setCanceledOnTouchOutside(false);
+
+        TextView close = makeDialogButton("Save & resume", true, false);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        closeParams.topMargin = dp(18);
+        card.addView(close, closeParams);
+        close.setOnClickListener(v -> {
+            dialog.dismiss();
+            resumeLevel();
+        });
+
+        displayDialog(dialog);
+    }
+
+    private void addSettingsSwitch(LinearLayout card,
+                                   String title, String subtitle, String preferenceKey) {
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams lineParams = fullWidth();
+        lineParams.topMargin = dp(22);
+        card.addView(line, lineParams);
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        line.addView(labels, labelsParams);
+        labels.addView(makeText(title, 16, Color.parseColor("#0F172A"), true));
+        TextView description = makeText(subtitle, 11, Color.parseColor("#64748B"), false);
+        LinearLayout.LayoutParams subtitleParams = fullWidth();
+        subtitleParams.topMargin = dp(3);
+        labels.addView(description, subtitleParams);
+
+        SwitchCompat toggle = new SwitchCompat(this);
+        toggle.setContentDescription(title);
+        toggle.setChecked(preferences.getBoolean(preferenceKey, true));
+        toggle.setOnCheckedChangeListener((button, value) ->
+                preferences.edit().putBoolean(preferenceKey, value).apply());
+        LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        switchParams.leftMargin = dp(10);
+        line.addView(toggle, switchParams);
+    }
+
+    private void styleHeaderButton(ImageButton button) {
+        button.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(Color.parseColor("#1E2563EB")),
+                roundedBackground(Color.WHITE, Color.parseColor("#E2E8F0"), 15), null));
+        button.setImageTintList(ColorStateList.valueOf(Color.parseColor("#334155")));
+        button.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        button.setPadding(dp(11), dp(11), dp(11), dp(11));
+    }
+
+    private void updateTimerProgress() {
+        if (timerTrack == null || timerFill == null) return;
+        int width = timerTrack.getWidth();
+        if (width <= 0) return;
+        long duration = levels.get(levelIndex).durationMs;
+        float fraction = duration == 0 ? 0f
+                : Math.max(0f, Math.min(1f, (float) timeRemainingMs / duration));
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) timerFill.getLayoutParams();
+        int newWidth = Math.round(width * fraction);
+        if (params.width != newWidth) {
+            params.width = newWidth;
+            timerFill.setLayoutParams(params);
+        }
+        int progressColor = fraction > 0.50f ? Color.parseColor("#2563EB")
+                : fraction > 0.20f ? Color.parseColor("#F59E0B")
+                : Color.parseColor("#EF4444");
+        timerFillDrawable.setColor(progressColor);
     }
 
     // ----------------------------------------------------------------------
@@ -501,17 +956,21 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        displayDialog(dialog);
+    }
+
+    private void displayDialog(AlertDialog dialog) {
+        if (activeDialog != null && activeDialog.isShowing()) activeDialog.dismiss();
         activeDialog = dialog;
         dialog.setOnDismissListener(ignored -> {
             if (activeDialog == dialog) activeDialog = null;
         });
         dialog.show();
-
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(36);
-            window.setLayout(Math.min(availableWidth, dp(420)),
+            int width = getResources().getDisplayMetrics().widthPixels - dp(36);
+            window.setLayout(Math.min(width, dp(420)),
                     ViewGroup.LayoutParams.WRAP_CONTENT);
         }
     }
@@ -558,8 +1017,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateHeader() {
         levelText.setText("Level " + (levelIndex + 1) + "/" + levels.size());
-        scoreText.setText("Score: " + totalScore);
+        scoreText.setText(String.valueOf(totalScore));
         timerText.setText(formatSeconds(timeRemainingMs));
+        updateTimerProgress();
     }
 
     private String formatSeconds(long ms) {
@@ -572,11 +1032,16 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        if (state == GameState.INTRO) {
+            stopIntroCountdown();
+            introRestartOnResume = true;
+        }
         if (state == GameState.PLAYING && countdownStarted) {
             timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
             stopCountdown();
             state = GameState.PAUSED;
             pauseButton.setEnabled(false);
+            settingsButton.setEnabled(false);
             pausedByBackground = true;
         }
         super.onPause();
@@ -585,6 +1050,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (introRestartOnResume && state == GameState.INTRO) {
+            introRestartOnResume = false;
+            boardContainer.post(this::startIntroCountdown);
+        }
         if (pausedByBackground) {
             pausedByBackground = false;
             gameGrid.post(() -> {
@@ -602,8 +1071,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        stopIntroCountdown();
         stopCountdown();
         if (activeDialog != null) activeDialog.dismiss();
+        if (scoreDatabase != null) scoreDatabase.close();
         super.onDestroy();
     }
 }
