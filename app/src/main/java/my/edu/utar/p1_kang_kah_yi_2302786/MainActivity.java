@@ -21,37 +21,90 @@ import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Each level has one normal tile color and one target tile color.
-    // The colors become more similar as levels get harder.
-    private static class LevelConfig {
-        final int gridSize;
-        final long durationMs;
+    // One color pair is picked at random whenever a level starts.
+    // All tiles use the normal color except one target tile.
+    private static class ColorPair {
         final int normalColor;
         final int targetColor;
 
-        LevelConfig(int gridSize, String normalHex, String targetHex) {
-            this(gridSize, normalHex, targetHex, 5_000L);
-        }
-
-        LevelConfig(int gridSize, String normalHex, String targetHex, long durationMs) {
-            this.gridSize = gridSize;
-            this.durationMs = durationMs;
-            this.normalColor = Color.parseColor(normalHex);
-            this.targetColor = Color.parseColor(targetHex);
+        ColorPair(String normalHex, String targetHex) {
+            normalColor = Color.parseColor(normalHex);
+            targetColor = Color.parseColor(targetHex);
         }
     }
 
-    // Format: LevelConfig(gridSize, normalTileColor, targetTileColor).
-    // All levels last 5 seconds by default.
+    private static ColorPair pair(String normalHex, String targetHex) {
+        return new ColorPair(normalHex, targetHex);
+    }
+
+    private static class LevelConfig {
+        final int gridSize;
+        final long durationMs;
+        final ColorPair[] colorPairs;
+
+        LevelConfig(int gridSize, ColorPair... colorPairs) {
+            this(gridSize, 5_000L, colorPairs);
+        }
+
+        LevelConfig(int gridSize, long durationMs, ColorPair... colorPairs) {
+            this.gridSize = gridSize;
+            this.durationMs = durationMs;
+            this.colorPairs = colorPairs;
+        }
+    }
+
+    // To change the look of a level, edit its pairs below.
+    // Format: pair("#NORMAL_TILE_COLOR", "#TARGET_TILE_COLOR").
+    // Later levels use shades that are progressively more alike.
     private final List<LevelConfig> levels = Arrays.asList(
-            new LevelConfig(2, "#B9DCF4", "#5299D3"), // Level 1: blue, 2 x 2
-            new LevelConfig(3, "#B9E4D5", "#78C5AA"), // Level 2: mint, 3 x 3
-            new LevelConfig(4, "#D8C8EB", "#BCA7D6"), // Level 3: lavender, 4 x 4
-            new LevelConfig(5, "#E9D4C6", "#DCC1AF"), // Level 4: peach, 5 x 5
-            new LevelConfig(6, "#B8DADA", "#A5C8C7"), // Level 5: teal, 6 x 6
-            new LevelConfig(7, "#D9D6EA", "#CCC9DF"), // Level 6: lilac, 7 x 7
-            new LevelConfig(8, "#DEDFCE", "#D1D3C5"), // Level 7: sage, 8 x 8
-            new LevelConfig(9, "#E4DBDF", "#D9D1D6")  // Level 8: rose-gray, 9 x 9
+            new LevelConfig(2, // Level 1: 2 x 2
+                    pair("#B9DCF4", "#70B1E0"), // blue
+                    pair("#B9E4D5", "#69C5A7"), // mint
+                    pair("#D8C8EB", "#A98DDA"), // lavender
+                    pair("#F1D1B8", "#E39E72")  // peach
+            ),
+            new LevelConfig(3, // Level 2: 3 x 3
+                    pair("#D0E5F3", "#9EC4E0"), // blue
+                    pair("#C7E8C7", "#A2D3A2"), // green
+                    pair("#F1D7D7", "#DDB1B1"), // pink
+                    pair("#E2D8F3", "#C3B8E7")  // lilac
+            ),
+            new LevelConfig(4, // Level 3: 4 x 4
+                    pair("#C7DFED", "#A6CCD9"), // blue
+                    pair("#D0E7DB", "#B5D7C3"), // mint
+                    pair("#E7D9F0", "#D3C3E2"), // purple
+                    pair("#F0DBCC", "#DFC5B0")  // sand
+            ),
+            new LevelConfig(5, // Level 4: 5 x 5
+                    pair("#BCD9EA", "#A6CADB"), // blue
+                    pair("#BFE5DD", "#A9D8CB"), // teal
+                    pair("#E8D8EA", "#D7C8DE"), // pink/lilac
+                    pair("#EADFC8", "#D8D2B6")  // beige
+            ),
+            new LevelConfig(6, // Level 5: 6 x 6
+                    pair("#BDD9DA", "#ADD0CF"), // teal
+                    pair("#DFD5EE", "#D0CBE4"), // lavender
+                    pair("#E8D6C9", "#DACDBE"), // peach
+                    pair("#D6E3BD", "#C8DAB1")  // light green
+            ),
+            new LevelConfig(7, // Level 6: 7 x 7
+                    pair("#C7DEEB", "#BDD7E4"), // blue
+                    pair("#CDE6D9", "#C2DFD1"), // mint
+                    pair("#E7D6E8", "#DCCFE1"), // pink
+                    pair("#E8DEC9", "#DDD7C2")  // cream
+            ),
+            new LevelConfig(8, // Level 7: 8 x 8
+                    pair("#D0E4ED", "#C6DDE5"), // blue
+                    pair("#D7E6CF", "#CDDFC7"), // sage
+                    pair("#E8D9DE", "#DED2D6"), // rose
+                    pair("#DDD8EB", "#D3D1E3")  // lilac
+            ),
+            new LevelConfig(9, // Level 8: 9 x 9
+                    pair("#D9E7EE", "#D1E1E8"), // blue
+                    pair("#D8E8DB", "#D0E2D5"), // green
+                    pair("#ECDCE3", "#E4D6DD"), // pink
+                    pair("#E7E0D8", "#DFDAD2")  // warm grey
+            )
     );
 
     private enum GameState {
@@ -66,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final List<TextView> tiles = new ArrayList<>();
     private final Random random = new Random();
+    private ColorPair currentColorPair; // Chosen once per level, not after every tap.
 
     private int levelIndex = 0;
     private int totalScore = 0;
@@ -101,7 +155,9 @@ public class MainActivity extends AppCompatActivity {
     private void startLevel(int newIndex) {
         stopCountdown();
         levelIndex = newIndex;
-        timeRemainingMs = levels.get(levelIndex).durationMs;
+        LevelConfig config = levels.get(levelIndex);
+        timeRemainingMs = config.durationMs;
+        currentColorPair = config.colorPairs[random.nextInt(config.colorPairs.length)];
         highlightedIndex = -1;
         state = GameState.PLAYING;
         pauseButton.setEnabled(true);
@@ -125,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
         gameGrid.setColumnCount(size);
 
         // Use smaller gaps for larger boards so 6x6 through 9x9 fit the screen.
-        int margin = size >= 6 ? dp(2) : dp(4);
+        int margin = size >= 6 ? dp(1) : dp(2);
         int boardWidth = gameGrid.getWidth();
 
         // Avoid a fixed minimum tile size, which could make Level 8 overflow.
@@ -182,11 +238,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private GradientDrawable tileBackground(boolean active) {
-        LevelConfig current = levels.get(levelIndex);
         GradientDrawable background = new GradientDrawable();
         background.setShape(GradientDrawable.RECTANGLE);
         background.setCornerRadius(dp(12));
-        background.setColor(active ? current.targetColor : current.normalColor);
+        background.setColor(active ? currentColorPair.targetColor : currentColorPair.normalColor);
         // Keep identical borders on all tiles; the color is the only clue.
         background.setStroke(dp(1), Color.parseColor("#FFFFFF"));
         return background;
