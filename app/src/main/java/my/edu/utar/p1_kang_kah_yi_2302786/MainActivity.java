@@ -1,6 +1,7 @@
 package my.edu.utar.p1_kang_kah_yi_2302786;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteException;
 import android.text.InputFilter;
@@ -154,6 +155,8 @@ public class MainActivity extends AppCompatActivity {
 
     private SharedPreferences preferences;
     private ScoreDatabaseHelper scoreDatabase;
+    private GameAudioManager audioManager;
+    private long lastWrongTapSoundMs = 0L;
     private static final String PREFS_NAME = "tap_target_settings";
     private static final String PREF_MUSIC = "music_enabled";
     private static final String PREF_SFX = "sfx_enabled";
@@ -194,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
         introHint = findViewById(R.id.introHint);
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         scoreDatabase = new ScoreDatabaseHelper(this);
+        audioManager = new GameAudioManager(this);
 
         // Centered level + score badges; no dividers or surrounding board panel.
         levelText.setBackground(roundedBackground(Color.parseColor("#E8EEF8"), 0, 50));
@@ -228,6 +232,7 @@ public class MainActivity extends AppCompatActivity {
         // Only Level 1 needs the special "Are You Ready?" introduction.
         boolean firstLevel = newIndex == 0;
         state = firstLevel ? GameState.INTRO : GameState.PLAYING;
+        audioManager.setMusicActive(true);
         pauseButton.setEnabled(!firstLevel);
         settingsButton.setEnabled(!firstLevel);
         introOverlay.setVisibility(firstLevel ? View.VISIBLE : View.GONE);
@@ -342,11 +347,43 @@ public class MainActivity extends AppCompatActivity {
             completeLevel();
             return;
         }
-        if (index != highlightedIndex) return;
+        if (index != highlightedIndex) {
+            // Rate-limit incorrect-tap audio to avoid a noisy burst of sounds.
+            long now = SystemClock.elapsedRealtime();
+            if (now - lastWrongTapSoundMs >= 120L) {
+                audioManager.playWrongTap();
+                lastWrongTapSoundMs = now;
+            }
+            return;
+        }
 
         totalScore++;
+        audioManager.playCorrectTap();
+        animateCorrectTap(tiles.get(index));
         updateHeader();
+        animateScore();
         highlightRandomTile(); // Repeating the same target is allowed.
+    }
+
+    // Tiny press effect without changing the tile color or showing a symbol.
+    private void animateCorrectTap(TextView tile) {
+        tile.animate().cancel();
+        tile.setScaleX(1f);
+        tile.setScaleY(1f);
+        tile.animate().scaleX(0.93f).scaleY(0.93f)
+                .setDuration(75L)
+                .withEndAction(() -> tile.animate().scaleX(1f).scaleY(1f)
+                        .setDuration(115L).start())
+                .start();
+    }
+
+    // Subtle feedback on the large score number after each correct tap.
+    private void animateScore() {
+        scoreText.animate().cancel();
+        scoreText.setScaleX(1.12f);
+        scoreText.setScaleY(1.12f);
+        scoreText.animate().scaleX(1f).scaleY(1f)
+                .setDuration(170L).start();
     }
 
     private void highlightRandomTile() {
@@ -415,6 +452,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         state = GameState.PAUSED;
+        audioManager.setMusicActive(false);
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
         updateHeader();
@@ -424,6 +462,7 @@ public class MainActivity extends AppCompatActivity {
     private void resumeLevel() {
         if (state != GameState.PAUSED) return;
         state = GameState.PLAYING;
+        audioManager.setMusicActive(true);
         startCountdown(); // Continue with remaining time, not a fresh 5 seconds.
     }
 
@@ -446,6 +485,8 @@ public class MainActivity extends AppCompatActivity {
         stopCountdown();
         timeRemainingMs = 0L;
         state = GameState.LEVEL_COMPLETE;
+        audioManager.setMusicActive(false);
+        audioManager.playLevelComplete();
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
         updateHeader();
@@ -494,6 +535,7 @@ public class MainActivity extends AppCompatActivity {
     private void endGame() {
         stopCountdown();
         state = GameState.GAME_OVER;
+        audioManager.setMusicActive(false);
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
 
@@ -505,7 +547,8 @@ public class MainActivity extends AppCompatActivity {
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore)},
                 "View results", this::showPostGameResults,
-                "Play again", this::startNewGame, false
+                "Play again", this::startNewGame, false,
+                "Main menu", this::returnToHome
         );
     }
 
@@ -701,16 +744,27 @@ public class MainActivity extends AppCompatActivity {
             startNewGame();
         });
 
-        TextView close = makeDialogButton("Close game", false, false);
+        TextView close = makeDialogButton("Main menu", false, false);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
         closeParams.topMargin = dp(8);
         card.addView(close, closeParams);
         close.setOnClickListener(v -> {
             dialog.dismiss();
-            finish();
+            returnToHome();
         });
         displayDialog(dialog);
+    }
+
+    // Return to the existing HomeActivity instead of closing the app.
+    private void returnToHome() {
+        stopIntroCountdown();
+        stopCountdown();
+        audioManager.setMusicActive(false);
+        Intent intent = new Intent(this, HomeActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
     }
 
     private void showLeaderboardErrorDialog() {
@@ -734,6 +788,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         state = GameState.PAUSED;
+        audioManager.setMusicActive(false);
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
         updateHeader();
@@ -747,15 +802,15 @@ public class MainActivity extends AppCompatActivity {
         card.addView(heading, fullWidth());
 
         TextView description = makeText(
-                "Personalize your game. Audio will be implemented in a future update.",
+                "Adjust the music and sound effects while your game is paused.",
                 13, Color.parseColor("#64748B"), false);
         description.setLineSpacing(dp(3), 1f);
         LinearLayout.LayoutParams descriptionParams = fullWidth();
         descriptionParams.topMargin = dp(10);
         card.addView(description, descriptionParams);
 
-        addSettingsSwitch(card, "Music", "Save music preference for a future update", PREF_MUSIC);
-        addSettingsSwitch(card, "Sound effects", "Save effects preference for a future update", PREF_SFX);
+        addSettingsSwitch(card, "Music", "Play looping background music", PREF_MUSIC);
+        addSettingsSwitch(card, "Sound effects", "Play tap and level-complete sounds", PREF_SFX);
 
         TextView note = makeText("Your game is paused while settings are open.",
                 12, Color.parseColor("#64748B"), false);
@@ -805,8 +860,10 @@ public class MainActivity extends AppCompatActivity {
         SwitchCompat toggle = new SwitchCompat(this);
         toggle.setContentDescription(title);
         toggle.setChecked(preferences.getBoolean(preferenceKey, true));
-        toggle.setOnCheckedChangeListener((button, value) ->
-                preferences.edit().putBoolean(preferenceKey, value).apply());
+        toggle.setOnCheckedChangeListener((button, value) -> {
+            preferences.edit().putBoolean(preferenceKey, value).apply();
+            audioManager.refreshPreferences();
+        });
         LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         switchParams.leftMargin = dp(10);
@@ -854,6 +911,22 @@ public class MainActivity extends AppCompatActivity {
             String primaryLabel, Runnable primaryAction,
             String secondaryLabel, Runnable secondaryAction,
             boolean secondaryDanger
+    ) {
+        showStyledDialog(symbol, eyebrow, title, description,
+                accentColor, iconBackgroundColor, metricLabels, metricValues,
+                primaryLabel, primaryAction, secondaryLabel, secondaryAction,
+                secondaryDanger, null, null);
+    }
+
+    // Optional third action is used for Main menu on the Game Over dialog.
+    private void showStyledDialog(
+            String symbol, String eyebrow, String title, String description,
+            int accentColor, int iconBackgroundColor,
+            String[] metricLabels, String[] metricValues,
+            String primaryLabel, Runnable primaryAction,
+            String secondaryLabel, Runnable secondaryAction,
+            boolean secondaryDanger,
+            String tertiaryLabel, Runnable tertiaryAction
     ) {
         if (isFinishing() || isDestroyed()) return;
 
@@ -956,6 +1029,18 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        if (tertiaryLabel != null && tertiaryAction != null) {
+            TextView tertiaryButton = makeDialogButton(tertiaryLabel, false, false);
+            LinearLayout.LayoutParams tertiaryParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+            tertiaryParams.topMargin = dp(9);
+            card.addView(tertiaryButton, tertiaryParams);
+            tertiaryButton.setOnClickListener(view -> {
+                dialog.dismiss();
+                tertiaryAction.run();
+            });
+        }
+
         displayDialog(dialog);
     }
 
@@ -1032,6 +1117,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
+        audioManager.onPause();
         if (state == GameState.INTRO) {
             stopIntroCountdown();
             introRestartOnResume = true;
@@ -1040,6 +1126,7 @@ public class MainActivity extends AppCompatActivity {
             timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
             stopCountdown();
             state = GameState.PAUSED;
+            audioManager.setMusicActive(false);
             pauseButton.setEnabled(false);
             settingsButton.setEnabled(false);
             pausedByBackground = true;
@@ -1050,6 +1137,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        audioManager.onResume();
         if (introRestartOnResume && state == GameState.INTRO) {
             introRestartOnResume = false;
             boardContainer.post(this::startIntroCountdown);
@@ -1075,6 +1163,7 @@ public class MainActivity extends AppCompatActivity {
         stopCountdown();
         if (activeDialog != null) activeDialog.dismiss();
         if (scoreDatabase != null) scoreDatabase.close();
+        if (audioManager != null) audioManager.release();
         super.onDestroy();
     }
 }
