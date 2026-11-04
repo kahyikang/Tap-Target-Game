@@ -1,13 +1,20 @@
 package my.edu.utar.p1_kang_kah_yi_2302786;
 
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.SystemClock;
 import android.view.Gravity;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.GridLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -298,17 +305,18 @@ public class MainActivity extends AppCompatActivity {
         startCountdown(); // Continue with remaining time, not a fresh 5 seconds.
     }
 
+    // The four dialogs below share one custom, light-themed layout.
     private void showPauseDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Game paused")
-                .setMessage("Level " + (levelIndex + 1)
-                        + " · Score: " + totalScore
-                        + "\nTime left: " + formatSeconds(timeRemainingMs))
-                .setCancelable(false)
-                .setPositiveButton("Resume", (dialog, which) -> resumeLevel())
-                .setNegativeButton("End Game", (dialog, which) ->
-                        confirmEndGame(this::showPauseDialog))
-                .show();
+        showStyledDialog(
+                "Ⅱ", "GAME PAUSED", "Take a break",
+                "Your remaining time is saved until you resume.",
+                Color.parseColor("#2563EB"), Color.parseColor("#DBEAFE"),
+                new String[]{"LEVEL", "SCORE", "TIME LEFT"},
+                new String[]{(levelIndex + 1) + "/" + levels.size(),
+                        String.valueOf(totalScore), formatSeconds(timeRemainingMs)},
+                "Resume game", this::resumeLevel,
+                "End game", () -> confirmEndGame(this::showPauseDialog), true
+        );
     }
 
     private void completeLevel() {
@@ -323,34 +331,40 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLevelCompleteDialog() {
         boolean lastLevel = levelIndex == levels.size() - 1;
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setTitle("Level " + (levelIndex + 1) + " complete!")
-                .setMessage("Total score: " + totalScore)
-                .setCancelable(false)
-                .setPositiveButton(lastLevel ? "Finish Game" : "Next Level", (dialog, which) -> {
+        int nextSize = lastLevel ? 0 : levels.get(levelIndex + 1).gridSize;
+
+        showStyledDialog(
+                "✓", "LEVEL COMPLETE", "Level " + (levelIndex + 1) + " cleared!",
+                lastLevel ? "You finished all " + levels.size() + " levels!"
+                        : "Great job! Ready for the next color challenge?",
+                Color.parseColor("#15803D"), Color.parseColor("#DCFCE7"),
+                new String[]{"LEVEL", "TOTAL SCORE", lastLevel ? "STATUS" : "NEXT GRID"},
+                new String[]{(levelIndex + 1) + "/" + levels.size(),
+                        String.valueOf(totalScore), lastLevel ? "Done" : nextSize + " x " + nextSize},
+                lastLevel ? "Finish game" : "Next level",
+                () -> {
                     if (lastLevel) {
                         confirmEndGame(this::showLevelCompleteDialog);
                     } else {
                         startLevel(levelIndex + 1);
                     }
-                });
-
-        if (!lastLevel) {
-            builder.setNegativeButton("End Game", (dialog, which) ->
-                    confirmEndGame(this::showLevelCompleteDialog));
-        }
-        builder.show();
+                },
+                lastLevel ? null : "End game",
+                lastLevel ? null : () -> confirmEndGame(this::showLevelCompleteDialog),
+                true
+        );
     }
 
-    private void confirmEndGame(Runnable onCancel) {
-        new AlertDialog.Builder(this)
-                .setTitle("End game?")
-                .setMessage("Your score is " + totalScore
-                        + ". Do you want to finish the game?")
-                .setCancelable(false)
-                .setPositiveButton("Yes, End Game", (dialog, which) -> endGame())
-                .setNegativeButton("Cancel", (dialog, which) -> onCancel.run())
-                .show();
+    private void confirmEndGame(Runnable returnToPreviousDialog) {
+        showStyledDialog(
+                "!", "CONFIRM ACTION", "End your game?",
+                "Your current score will be finalized. This cannot be undone.",
+                Color.parseColor("#DC2626"), Color.parseColor("#FEE2E2"),
+                new String[]{"CURRENT LEVEL", "TOTAL SCORE"},
+                new String[]{String.valueOf(levelIndex + 1), String.valueOf(totalScore)},
+                "Keep playing", returnToPreviousDialog,
+                "Yes, end game", this::endGame, true
+        );
     }
 
     private void endGame() {
@@ -358,17 +372,188 @@ public class MainActivity extends AppCompatActivity {
         state = GameState.GAME_OVER;
         pauseButton.setEnabled(false);
 
-        // NEXT PHASE: check Top 25 qualification, enter name, save score,
-        // and display the persistent leaderboard.
-        new AlertDialog.Builder(this)
-                .setTitle("Game Over")
-                .setMessage("You reached Level " + (levelIndex + 1)
-                        + ".\nFinal score: " + totalScore
-                        + "\n\nLeaderboard comes next!")
+        // NEXT PHASE: check Top 25 qualification, save the name and score,
+        // and open the leaderboard from here.
+        showStyledDialog(
+                "★", "RUN COMPLETE", "Game over",
+                "Nice effort! You reached Level " + (levelIndex + 1) + ".",
+                Color.parseColor("#7C3AED"), Color.parseColor("#EDE9FE"),
+                new String[]{"LEVEL REACHED", "FINAL SCORE"},
+                new String[]{(levelIndex + 1) + "/" + levels.size(),
+                        String.valueOf(totalScore)},
+                "Play again", this::startNewGame,
+                "Close game", this::finish, false
+        );
+    }
+
+    // ----------------------------------------------------------------------
+    // Reusable dialog UI. All views are built in Java; no extra XML is needed.
+    // ----------------------------------------------------------------------
+
+    private AlertDialog activeDialog;
+
+    private void showStyledDialog(
+            String symbol, String eyebrow, String title, String description,
+            int accentColor, int iconBackgroundColor,
+            String[] metricLabels, String[] metricValues,
+            String primaryLabel, Runnable primaryAction,
+            String secondaryLabel, Runnable secondaryAction,
+            boolean secondaryDanger
+    ) {
+        if (isFinishing() || isDestroyed()) return;
+
+        // Close any previous popup to avoid stacking dialogs.
+        if (activeDialog != null && activeDialog.isShowing()) {
+            activeDialog.dismiss();
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(dp(22), dp(24), dp(22), dp(22));
+        card.setBackground(roundedBackground(Color.WHITE, 0, 24));
+
+        TextView symbolView = makeText(symbol, 27, accentColor, true);
+        symbolView.setGravity(Gravity.CENTER);
+        symbolView.setBackground(roundedBackground(iconBackgroundColor, 0, 50));
+        LinearLayout.LayoutParams symbolParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+        symbolParams.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(symbolView, symbolParams);
+
+        TextView eyebrowView = makeText(eyebrow, 11, accentColor, true);
+        eyebrowView.setLetterSpacing(0.12f);
+        eyebrowView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams eyebrowParams = fullWidth();
+        eyebrowParams.topMargin = dp(16);
+        card.addView(eyebrowView, eyebrowParams);
+
+        TextView titleView = makeText(title, 23, Color.parseColor("#0F172A"), true);
+        titleView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = fullWidth();
+        titleParams.topMargin = dp(5);
+        card.addView(titleView, titleParams);
+
+        TextView subtitleView = makeText(description, 14, Color.parseColor("#64748B"), false);
+        subtitleView.setGravity(Gravity.CENTER);
+        subtitleView.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams subtitleParams = fullWidth();
+        subtitleParams.topMargin = dp(9);
+        card.addView(subtitleView, subtitleParams);
+
+        if (metricLabels.length != metricValues.length) {
+            throw new IllegalArgumentException("Metric labels and values must match");
+        }
+        LinearLayout statsRow = new LinearLayout(this);
+        statsRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams statsRowParams = fullWidth();
+        statsRowParams.topMargin = dp(20);
+        card.addView(statsRow, statsRowParams);
+
+        for (int i = 0; i < metricLabels.length; i++) {
+            LinearLayout statCard = new LinearLayout(this);
+            statCard.setOrientation(LinearLayout.VERTICAL);
+            statCard.setGravity(Gravity.CENTER);
+            statCard.setPadding(dp(4), dp(13), dp(4), dp(13));
+            statCard.setBackground(roundedBackground(Color.parseColor("#F1F5F9"), 0, 13));
+
+            TextView statValue = makeText(metricValues[i], 18, Color.parseColor("#0F172A"), true);
+            statValue.setGravity(Gravity.CENTER);
+            statCard.addView(statValue, fullWidth());
+
+            TextView statLabel = makeText(metricLabels[i], 9, Color.parseColor("#64748B"), true);
+            statLabel.setGravity(Gravity.CENTER);
+            statLabel.setLetterSpacing(0.04f);
+            LinearLayout.LayoutParams labelParams = fullWidth();
+            labelParams.topMargin = dp(4);
+            statCard.addView(statLabel, labelParams);
+
+            LinearLayout.LayoutParams statParams = new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            statParams.setMargins(dp(3), 0, dp(3), 0);
+            statsRow.addView(statCard, statParams);
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card)
                 .setCancelable(false)
-                .setPositiveButton("Play Again", (dialog, which) -> startNewGame())
-                .setNegativeButton("Close", (dialog, which) -> finish())
-                .show();
+                .create();
+        dialog.setCanceledOnTouchOutside(false);
+
+        TextView primaryButton = makeDialogButton(primaryLabel, true, false);
+        LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        primaryParams.topMargin = dp(22);
+        card.addView(primaryButton, primaryParams);
+        primaryButton.setOnClickListener(view -> {
+            dialog.dismiss();
+            primaryAction.run();
+        });
+
+        if (secondaryLabel != null && secondaryAction != null) {
+            TextView secondaryButton = makeDialogButton(secondaryLabel, false, secondaryDanger);
+            LinearLayout.LayoutParams secondaryParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+            secondaryParams.topMargin = dp(9);
+            card.addView(secondaryButton, secondaryParams);
+            secondaryButton.setOnClickListener(view -> {
+                dialog.dismiss();
+                secondaryAction.run();
+            });
+        }
+
+        activeDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (activeDialog == dialog) activeDialog = null;
+        });
+        dialog.show();
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(36);
+            window.setLayout(Math.min(availableWidth, dp(420)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private TextView makeText(String text, float sp, int color, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(sp);
+        view.setTextColor(color);
+        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return view;
+    }
+
+    private TextView makeDialogButton(String label, boolean primary, boolean danger) {
+        TextView button = makeText(label, 15,
+                primary ? Color.WHITE : danger ? Color.parseColor("#DC2626")
+                        : Color.parseColor("#334155"), true);
+        button.setGravity(Gravity.CENTER);
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setContentDescription(label);
+
+        int fill = primary ? Color.parseColor("#2563EB") : Color.WHITE;
+        int stroke = primary ? 0 : danger ? Color.parseColor("#FECACA")
+                : Color.parseColor("#CBD5E1");
+        GradientDrawable background = roundedBackground(fill, stroke, 14);
+        button.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(Color.parseColor("#220F172A")), background, null));
+        return button;
+    }
+
+    private GradientDrawable roundedBackground(int fillColor, int strokeColor, int cornerDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fillColor);
+        drawable.setCornerRadius(dp(cornerDp));
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        return drawable;
+    }
+
+    private LinearLayout.LayoutParams fullWidth() {
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private void updateHeader() {
@@ -418,6 +603,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         stopCountdown();
+        if (activeDialog != null) activeDialog.dismiss();
         super.onDestroy();
     }
 }
