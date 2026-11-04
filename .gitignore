@@ -1,0 +1,30 @@
+# Android Studio / Gradle generated files
+.gradle/
+.kotlin/
+**/build/
+.idea/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Generated packages and build metadata
+*.apk
+*.aab
+output-metadata.json
+
+# Logs, profiling, and OS clutter
+*.log
+*.hprof
+.DS_Store
+Thumbs.db
+
+# Signing credentials and local secrets
+*.jks
+*.keystore
+key.properties
+secrets.properties
+google-services.json
+
+# NOTE: Keep gradlew, gradlew.bat and gradle/wrapper/ in Git.
