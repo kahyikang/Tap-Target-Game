@@ -21,26 +21,37 @@ import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Add new LevelConfig(6), LevelConfig(7), etc. here in the future.
+    // Each level has one normal tile color and one target tile color.
+    // The colors become more similar as levels get harder.
     private static class LevelConfig {
         final int gridSize;
         final long durationMs;
+        final int normalColor;
+        final int targetColor;
 
-        LevelConfig(int gridSize) {
-            this(gridSize, 5_000L);
+        LevelConfig(int gridSize, String normalHex, String targetHex) {
+            this(gridSize, normalHex, targetHex, 5_000L);
         }
 
-        LevelConfig(int gridSize, long durationMs) {
+        LevelConfig(int gridSize, String normalHex, String targetHex, long durationMs) {
             this.gridSize = gridSize;
             this.durationMs = durationMs;
+            this.normalColor = Color.parseColor(normalHex);
+            this.targetColor = Color.parseColor(targetHex);
         }
     }
 
+    // Format: LevelConfig(gridSize, normalTileColor, targetTileColor).
+    // All levels last 5 seconds by default.
     private final List<LevelConfig> levels = Arrays.asList(
-            new LevelConfig(2), // Level 1: 4 tiles
-            new LevelConfig(3), // Level 2: 9 tiles
-            new LevelConfig(4), // Level 3: 16 tiles
-            new LevelConfig(5)  // Level 4: 25 tiles
+            new LevelConfig(2, "#B9DCF4", "#5299D3"), // Level 1: blue, 2 x 2
+            new LevelConfig(3, "#B9E4D5", "#78C5AA"), // Level 2: mint, 3 x 3
+            new LevelConfig(4, "#D8C8EB", "#BCA7D6"), // Level 3: lavender, 4 x 4
+            new LevelConfig(5, "#E9D4C6", "#DCC1AF"), // Level 4: peach, 5 x 5
+            new LevelConfig(6, "#B8DADA", "#A5C8C7"), // Level 5: teal, 6 x 6
+            new LevelConfig(7, "#D9D6EA", "#CCC9DF"), // Level 6: lilac, 7 x 7
+            new LevelConfig(8, "#DEDFCE", "#D1D3C5"), // Level 7: sage, 8 x 8
+            new LevelConfig(9, "#E4DBDF", "#D9D1D6")  // Level 8: rose-gray, 9 x 9
     );
 
     private enum GameState {
@@ -113,16 +124,18 @@ public class MainActivity extends AppCompatActivity {
         gameGrid.setRowCount(size);
         gameGrid.setColumnCount(size);
 
-        int margin = dp(4);
+        // Use smaller gaps for larger boards so 6x6 through 9x9 fit the screen.
+        int margin = size >= 6 ? dp(2) : dp(4);
         int boardWidth = gameGrid.getWidth();
-        int tileSize = Math.max(dp(28), (boardWidth - size * margin * 2) / size);
+
+        // Avoid a fixed minimum tile size, which could make Level 8 overflow.
+        int tileSize = Math.max(1, (boardWidth - size * margin * 2) / size);
 
         for (int index = 0; index < size * size; index++) {
             final int tileIndex = index;
             TextView tile = new TextView(this);
             tile.setGravity(Gravity.CENTER);
-            tile.setTextSize(24f);
-            tile.setTextColor(Color.WHITE);
+            // No star or label: players spot the target by its color alone.
             tile.setContentDescription("Tile " + (index + 1));
             tile.setBackground(tileBackground(false));
             tile.setOnClickListener(v -> handleTileTap(tileIndex));
@@ -162,7 +175,6 @@ public class MainActivity extends AppCompatActivity {
             boolean active = index == highlightedIndex;
             TextView tile = tiles.get(index);
             tile.setBackground(tileBackground(active));
-            tile.setText(active ? "★" : "");
             tile.setContentDescription(active
                     ? "Highlighted target, tile " + (index + 1)
                     : "Tile " + (index + 1));
@@ -170,11 +182,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private GradientDrawable tileBackground(boolean active) {
+        LevelConfig current = levels.get(levelIndex);
         GradientDrawable background = new GradientDrawable();
         background.setShape(GradientDrawable.RECTANGLE);
         background.setCornerRadius(dp(12));
-        background.setColor(Color.parseColor(active ? "#22C55E" : "#273449"));
-        background.setStroke(dp(2), Color.parseColor(active ? "#86EFAC" : "#40516A"));
+        background.setColor(active ? current.targetColor : current.normalColor);
+        // Keep identical borders on all tiles; the color is the only clue.
+        background.setStroke(dp(1), Color.parseColor("#FFFFFF"));
         return background;
     }
 
