@@ -53,10 +53,47 @@ public class MainActivity extends AppCompatActivity {
             normalColor = Color.parseColor(normalHex);
             targetColor = Color.parseColor(targetHex);
         }
+
+        ColorPair(int normalColor, int targetColor) {
+            this.normalColor = normalColor;
+            this.targetColor = targetColor;
+        }
     }
 
     private static ColorPair pair(String normalHex, String targetHex) {
         return new ColorPair(normalHex, targetHex);
+    }
+
+    // Approximate RGB color-distance targets, before device/display variation.
+    // Easy stays the same across levels; Hard becomes steadily more subtle.
+    private static final float EASY_COLOR_DISTANCE = 90f;
+    private static final float[] HARD_COLOR_DISTANCE_BY_LEVEL = {
+            80f, 70f, 59f, 49f, 39f, 31f, 23f, 15f
+    };
+
+    /** Keep each selected color pair's hue direction but normalize the difference. */
+    private static int targetWithDistance(ColorPair source, float distance) {
+        int r = Color.red(source.normalColor);
+        int g = Color.green(source.normalColor);
+        int b = Color.blue(source.normalColor);
+        double dr = Color.red(source.targetColor) - r;
+        double dg = Color.green(source.targetColor) - g;
+        double db = Color.blue(source.targetColor) - b;
+        double magnitude = Math.sqrt(dr * dr + dg * dg + db * db);
+        if (magnitude < 0.01) {
+            // A valid color pair must have different shades; use a fallback direction.
+            dr = dg = db = -1;
+            magnitude = Math.sqrt(3);
+        }
+        double scale = distance / magnitude;
+        return Color.rgb(
+                clampColor((int) Math.round(r + dr * scale)),
+                clampColor((int) Math.round(g + dg * scale)),
+                clampColor((int) Math.round(b + db * scale)));
+    }
+
+    private static int clampColor(int channel) {
+        return Math.max(0, Math.min(255, channel));
     }
 
     private static class LevelConfig {
@@ -75,9 +112,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // To change the look of a level, edit its pairs below.
-    // Format: pair("#NORMAL_TILE_COLOR", "#TARGET_TILE_COLOR").
-    // Later levels use shades that are progressively more alike.
+    // Random level color pairs determine each target's color direction.
+    // Easy normalizes the difference to a fixed strength; Hard reduces it by level.
     private final List<LevelConfig> levels = Arrays.asList(
             new LevelConfig(2, // Level 1: 2 x 2
                     pair("#B9DCF4", "#70B1E0"), // blue
@@ -154,7 +190,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean introRestartOnResume = false;
 
     private SharedPreferences preferences;
-    private ScoreDatabaseHelper scoreDatabase;
+    private ModeScoreDatabaseHelper scoreDatabase;
+    private GameMode gameMode = GameMode.EASY;
     private GameAudioManager audioManager;
     private Boolean qualifiedAtFinish = null;
     private long lastWrongTapSoundMs = 0L;
@@ -197,7 +234,12 @@ public class MainActivity extends AppCompatActivity {
         introNumber = findViewById(R.id.introNumber);
         introHint = findViewById(R.id.introHint);
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        scoreDatabase = new ScoreDatabaseHelper(this);
+        // Default to Easy for older shortcuts/intents that carry no mode.
+        gameMode = GameMode.fromExtra(getIntent().getStringExtra(GameMode.EXTRA_MODE));
+        scoreDatabase = new ModeScoreDatabaseHelper(this);
+        ScoreDatabaseHelper legacyScores = new ScoreDatabaseHelper(this);
+        try { scoreDatabase.importLegacyScores(legacyScores); }
+        finally { legacyScores.close(); }
         audioManager = new GameAudioManager(this);
 
         // Centered level + score badges; no dividers or surrounding board panel.
@@ -239,7 +281,13 @@ public class MainActivity extends AppCompatActivity {
         levelIndex = newIndex;
         LevelConfig config = levels.get(levelIndex);
         timeRemainingMs = config.durationMs;
-        currentColorPair = config.colorPairs[random.nextInt(config.colorPairs.length)];
+        ColorPair palette = config.colorPairs[random.nextInt(config.colorPairs.length)];
+        // Easy: same visible contrast at every level. Hard: progressively subtler.
+        // Both original colors in the chosen pair contribute to the new shade.
+        float distance = gameMode == GameMode.EASY ? EASY_COLOR_DISTANCE
+                : HARD_COLOR_DISTANCE_BY_LEVEL[levelIndex];
+        currentColorPair = new ColorPair(palette.normalColor,
+                targetWithDistance(palette, distance));
         highlightedIndex = -1;
         // Only Level 1 needs the special "Are You Ready?" introduction.
         boolean firstLevel = newIndex == 0;
@@ -505,12 +553,23 @@ public class MainActivity extends AppCompatActivity {
         stopCountdown();
         timeRemainingMs = 0L;
         state = GameState.LEVEL_COMPLETE;
-        audioManager.setMusicActive(false);
+        // Easy pauses between levels; Hard keeps music continuous between grids.
+        if (gameMode == GameMode.EASY || levelIndex == levels.size() - 1) {
+            audioManager.setMusicActive(false);
+        }
         audioManager.playLevelComplete();
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
         updateHeader();
-        showLevelCompleteDialog();
+        if (gameMode == GameMode.HARD) {
+            // No between-level dialog in Hard mode: play straight through all 8.
+            // The Pause button still permits a voluntary pause at any time.
+            if (levelIndex == levels.size() - 1) endGame();
+            else startLevel(levelIndex + 1);
+        } else {
+            // Easy mode retains its Next Level / End Game choice.
+            showLevelCompleteDialog();
+        }
     }
 
     private void showLevelCompleteDialog() {
@@ -559,7 +618,7 @@ public class MainActivity extends AppCompatActivity {
         audioManager.setMusicActive(true);
         qualifiedAtFinish = null;
         try {
-            qualifiedAtFinish = scoreDatabase.qualifies(totalScore);
+            qualifiedAtFinish = scoreDatabase.qualifies(totalScore, gameMode);
             if (qualifiedAtFinish) audioManager.playCongratulations();
         } catch (SQLiteException error) {
             // Results can still show the existing database error dialog later.
@@ -572,7 +631,7 @@ public class MainActivity extends AppCompatActivity {
                 null,
                 Color.parseColor("#E6AC29"), Color.parseColor("#FFF3CD"),
                 new String[]{"LEVEL REACHED", "FINAL SCORE"},
-                new String[]{(levelIndex + 1) + "/" + levels.size(),
+                new String[]{gameMode.label() + " " + (levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore)},
                 "View results", this::showPostGameResults,
                 "Play again", this::startNewGame, false,
@@ -584,7 +643,7 @@ public class MainActivity extends AppCompatActivity {
     // Unqualified scores still lead to the Top 25 table, without a name prompt.
     private void showPostGameResults() {
         try {
-            if (qualifiedAtFinish != null ? qualifiedAtFinish : scoreDatabase.qualifies(totalScore)) {
+            if (qualifiedAtFinish != null ? qualifiedAtFinish : scoreDatabase.qualifies(totalScore, gameMode)) {
                 showNameEntryDialog();
             } else {
                 showLeaderboardDialog();
@@ -608,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView scoreBadge = makeText("Score: " + totalScore, 18,
+        TextView scoreBadge = makeText(gameMode.label() + " Mode  •  Score: " + totalScore, 18,
                 Color.parseColor("#7858C8"), true);
         scoreBadge.setGravity(Gravity.CENTER);
         scoreBadge.setPadding(dp(14), dp(9), dp(14), dp(9));
@@ -651,7 +710,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             try {
-                if (!scoreDatabase.insertIfQualified(name, totalScore)) {
+                if (!scoreDatabase.insertIfQualified(name, totalScore, gameMode)) {
                     Toast.makeText(this, "Score did not qualify for Top 25.",
                             Toast.LENGTH_SHORT).show();
                 }
@@ -675,11 +734,13 @@ public class MainActivity extends AppCompatActivity {
         displayDialog(dialog);
     }
 
-    private void showLeaderboardDialog() {
+    private void showLeaderboardDialog() { showLeaderboardDialog(gameMode); }
+
+    private void showLeaderboardDialog(GameMode selectedMode) {
         if (isFinishing() || isDestroyed()) return;
-        final List<ScoreDatabaseHelper.ScoreEntry> entries;
+        final List<ModeScoreDatabaseHelper.ScoreEntry> entries;
         try {
-            entries = scoreDatabase.getTop25();
+            entries = scoreDatabase.getTop25(selectedMode);
         } catch (SQLiteException error) {
             showLeaderboardErrorDialog();
             return;
@@ -695,6 +756,7 @@ public class MainActivity extends AppCompatActivity {
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
+        addLeaderboardTabs(card, selectedMode);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
@@ -720,7 +782,7 @@ public class MainActivity extends AppCompatActivity {
             rows.addView(empty, fullWidth());
         } else {
             for (int i = 0; i < entries.size(); i++) {
-                ScoreDatabaseHelper.ScoreEntry score = entries.get(i);
+                ModeScoreDatabaseHelper.ScoreEntry score = entries.get(i);
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
@@ -778,6 +840,34 @@ public class MainActivity extends AppCompatActivity {
             returnToHome();
         });
         displayDialog(dialog);
+    }
+
+    /** Both boards are visible, but only one board's scores are shown at a time. */
+    private void addLeaderboardTabs(LinearLayout card, GameMode selectedMode) {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams tabsParams = fullWidth();
+        tabsParams.topMargin = dp(14);
+        card.addView(tabs, tabsParams);
+        for (GameMode tabMode : GameMode.values()) {
+            boolean selected = tabMode == selectedMode;
+            TextView tab = makeText(tabMode.label() + " Mode", 14,
+                    Color.parseColor(selected ? "#FFFFFF" : "#50456B"), true);
+            tab.setGravity(Gravity.CENTER);
+            tab.setClickable(true);
+            tab.setFocusable(true);
+            tab.setPadding(dp(9), dp(11), dp(9), dp(11));
+            tab.setBackground(roundedBackground(
+                    Color.parseColor(selected ? "#7858C8" : "#EAF5FC"), 0, 13));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(43), 1f);
+            lp.setMargins(dp(3), 0, dp(3), 0);
+            tabs.addView(tab, lp);
+            tab.setOnClickListener(v -> {
+                if (selected) return;
+                audioManager.playButtonClick();
+                showLeaderboardDialog(tabMode);
+            });
+        }
     }
 
     // Return to the existing HomeActivity instead of closing the app.
@@ -1148,7 +1238,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateHeader() {
-        levelText.setText("Level " + (levelIndex + 1) + "/" + levels.size());
+        levelText.setText(gameMode.label() + "  •  Level "
+                + (levelIndex + 1) + "/" + levels.size());
         scoreText.setText(String.valueOf(totalScore));
         timerText.setText(formatSeconds(timeRemainingMs));
         updateTimerProgress();

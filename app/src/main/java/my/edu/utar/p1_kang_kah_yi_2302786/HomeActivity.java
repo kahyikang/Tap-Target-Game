@@ -39,7 +39,7 @@ public class HomeActivity extends AppCompatActivity {
     private static final String PREF_MUSIC = "music_enabled";
     private static final String PREF_SFX = "sfx_enabled";
 
-    private ScoreDatabaseHelper scoreDatabase;
+    private ModeScoreDatabaseHelper scoreDatabase;
     private SharedPreferences preferences;
     private GameAudioManager audioManager;
     private AlertDialog activeDialog;
@@ -48,7 +48,10 @@ public class HomeActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
-        scoreDatabase = new ScoreDatabaseHelper(this);
+        scoreDatabase = new ModeScoreDatabaseHelper(this);
+        ScoreDatabaseHelper legacyScores = new ScoreDatabaseHelper(this);
+        try { scoreDatabase.importLegacyScores(legacyScores); }
+        finally { legacyScores.close(); }
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         audioManager = new GameAudioManager(this);
         audioManager.setMusicMode(GameAudioManager.MusicMode.MENU);
@@ -70,7 +73,7 @@ public class HomeActivity extends AppCompatActivity {
 
         play.setOnClickListener(v -> {
             audioManager.playButtonClick();
-            startActivity(new Intent(this, MainActivity.class));
+            showModeSelectionDialog();
         });
         leaderboard.setOnClickListener(v -> {
             audioManager.playButtonClick();
@@ -82,11 +85,62 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    /** Builds a scrollable list using the SAME database as the game-over flow. */
-    private void showLeaderboardDialog() {
-        final List<ScoreDatabaseHelper.ScoreEntry> scores;
+    /** Choose a mode before gameplay; the mode stays selected for this entire run. */
+    private void showModeSelectionDialog() {
+        LinearLayout card = dialogCard();
+        TextView title = label("SELECT GAME MODE", 22, "#30264D", true);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title, fullWidth());
+
+        TextView easy = modeChoice("EASY MODE", "Same color difference in all 8 levels",
+                "#E8F6FF", "#365B82");
+        LinearLayout.LayoutParams easyParams = fullWidth();
+        easyParams.topMargin = dp(22);
+        card.addView(easy, easyParams);
+
+        TextView hard = modeChoice("HARD MODE", "Harder shades · levels advance automatically",
+                "#F0E8FF", "#7858C8");
+        LinearLayout.LayoutParams hardParams = fullWidth();
+        hardParams.topMargin = dp(12);
+        card.addView(hard, hardParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card).setCancelable(true).create();
+        easy.setOnClickListener(v -> startChosenMode(dialog, GameMode.EASY));
+        hard.setOnClickListener(v -> startChosenMode(dialog, GameMode.HARD));
+        displayDialog(dialog);
+    }
+
+    private TextView modeChoice(String title, String detail,
+                                String background, String foreground) {
+        TextView choice = label(title + "\n" + detail, 14, foreground, true);
+        choice.setGravity(Gravity.CENTER);
+        choice.setLineSpacing(dp(6), 1f);
+        choice.setPadding(dp(14), dp(16), dp(14), dp(16));
+        choice.setClickable(true);
+        choice.setFocusable(true);
+        choice.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(Color.parseColor("#225A45A8")),
+                roundedBackground(Color.parseColor(background),
+                        Color.parseColor("#D8D2EB"), 15), null));
+        return choice;
+    }
+
+    private void startChosenMode(AlertDialog dialog, GameMode mode) {
+        audioManager.playButtonClick();
+        dialog.dismiss();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra(GameMode.EXTRA_MODE, mode.key());
+        startActivity(intent);
+    }
+
+    /** Builds a scrollable Top 25 table for the selected mode. */
+    private void showLeaderboardDialog() { showLeaderboardDialog(GameMode.EASY); }
+
+    private void showLeaderboardDialog(GameMode selectedMode) {
+        final List<ModeScoreDatabaseHelper.ScoreEntry> scores;
         try {
-            scores = scoreDatabase.getTop25();
+            scores = scoreDatabase.getTop25(selectedMode);
         } catch (SQLiteException error) {
             Toast.makeText(this, "Couldn't load saved scores.", Toast.LENGTH_LONG).show();
             return;
@@ -97,6 +151,7 @@ public class HomeActivity extends AppCompatActivity {
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
+        addLeaderboardTabs(card, selectedMode);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
@@ -121,7 +176,7 @@ public class HomeActivity extends AppCompatActivity {
             rows.addView(empty, fullWidth());
         } else {
             for (int i = 0; i < scores.size(); i++) {
-                ScoreDatabaseHelper.ScoreEntry entry = scores.get(i);
+                ModeScoreDatabaseHelper.ScoreEntry entry = scores.get(i);
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
@@ -164,6 +219,32 @@ public class HomeActivity extends AppCompatActivity {
             dialog.dismiss();
         });
         displayDialog(dialog);
+    }
+
+    private void addLeaderboardTabs(LinearLayout card, GameMode selectedMode) {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams tabsParams = fullWidth();
+        tabsParams.topMargin = dp(14);
+        card.addView(tabs, tabsParams);
+        for (GameMode tabMode : GameMode.values()) {
+            boolean selected = tabMode == selectedMode;
+            TextView tab = label(tabMode.label() + " Mode", 14,
+                    selected ? "#FFFFFF" : "#50456B", true);
+            tab.setGravity(Gravity.CENTER);
+            tab.setClickable(true);
+            tab.setFocusable(true);
+            tab.setBackground(roundedBackground(Color.parseColor(
+                    selected ? "#7858C8" : "#EAF5FC"), 0, 13));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(43), 1f);
+            lp.setMargins(dp(3), 0, dp(3), 0);
+            tabs.addView(tab, lp);
+            tab.setOnClickListener(v -> {
+                if (selected) return;
+                audioManager.playButtonClick();
+                showLeaderboardDialog(tabMode);
+            });
+        }
     }
 
     /** Preferences directly control live audio playback. */
