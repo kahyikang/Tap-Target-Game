@@ -52,6 +52,8 @@ public class HomeActivity extends AppCompatActivity {
         ScoreDatabaseHelper legacyScores = new ScoreDatabaseHelper(this);
         try { scoreDatabase.importLegacyScores(legacyScores); }
         finally { legacyScores.close(); }
+        // Seed only once per mode and preserve previously saved records.
+        scoreDatabase.seedInitialSampleScores();
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         audioManager = new GameAudioManager(this);
         audioManager.setMusicMode(GameAudioManager.MusicMode.MENU);
@@ -64,16 +66,22 @@ public class HomeActivity extends AppCompatActivity {
         }, 24, 0));
         logo.setColorFilter(Color.parseColor("#7858C8"));
         View play = findViewById(R.id.playButton);
+        View howToPlay = findViewById(R.id.howToPlayButton);
         View leaderboard = findViewById(R.id.leaderboardButton);
         View settings = findViewById(R.id.homeSettingsButton);
 
         styleButton(play, true);
+        styleButton(howToPlay, false);
         styleButton(leaderboard, false);
         styleButton(settings, false);
 
         play.setOnClickListener(v -> {
             audioManager.playButtonClick();
             showModeSelectionDialog();
+        });
+        howToPlay.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            showHowToPlayDialog();
         });
         leaderboard.setOnClickListener(v -> {
             audioManager.playButtonClick();
@@ -83,6 +91,291 @@ public class HomeActivity extends AppCompatActivity {
             audioManager.playButtonClick();
             showSettingsDialog();
         });
+    }
+
+    /** Graphic multi-page instructions; available without starting or interrupting a game. */
+    private void showHowToPlayDialog() {
+        LinearLayout card = dialogCard();
+        card.setPadding(dp(18), dp(18), dp(18), dp(18));
+
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(topRow, fullWidth());
+
+        TextView leftSpacer = label("", 18, "#30264D", true);
+        topRow.addView(leftSpacer, new LinearLayout.LayoutParams(dp(30), dp(30)));
+
+        TextView heading = label("HOW TO PLAY", 21, "#30264D", true);
+        heading.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        topRow.addView(heading, headingParams);
+
+        TextView close = label("✕", 18, "#7858C8", true);
+        close.setGravity(Gravity.CENTER);
+        close.setClickable(true);
+        close.setFocusable(true);
+        close.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(Color.parseColor("#227858C8")),
+                roundedBackground(Color.parseColor("#F2EEFF"), 0, 15), null));
+        topRow.addView(close, new LinearLayout.LayoutParams(dp(30), dp(30)));
+
+        final LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(14), dp(16), dp(14), dp(14));
+        content.setBackground(roundedBackground(Color.parseColor("#FBFCFF"),
+                Color.parseColor("#E4EAF4"), 18));
+        LinearLayout.LayoutParams contentParams = fullWidth();
+        contentParams.topMargin = dp(14);
+        card.addView(content, contentParams);
+
+        final TextView pageIndicator = label("1 / 4", 13, "#7858C8", true);
+        pageIndicator.setGravity(Gravity.CENTER);
+
+        final TextView previous = label("Previous", 14, "#5D5477", true);
+        previous.setGravity(Gravity.CENTER);
+        previous.setPadding(dp(14), dp(12), dp(14), dp(12));
+        previous.setClickable(true);
+        previous.setFocusable(true);
+
+        final TextView next = dialogButton("Next");
+        next.setPadding(dp(14), dp(12), dp(14), dp(12));
+
+        LinearLayout navRow = new LinearLayout(this);
+        navRow.setOrientation(LinearLayout.HORIZONTAL);
+        navRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams navParams = fullWidth();
+        navParams.topMargin = dp(14);
+        card.addView(navRow, navParams);
+
+        LinearLayout.LayoutParams navButtonParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        navRow.addView(previous, navButtonParams);
+
+        LinearLayout.LayoutParams indicatorParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        indicatorParams.leftMargin = dp(10);
+        indicatorParams.rightMargin = dp(10);
+        navRow.addView(pageIndicator, indicatorParams);
+
+        navRow.addView(next, navButtonParams);
+
+        final int[] page = {0};
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(card).setCancelable(true).create();
+
+        final Runnable[] refreshPage = new Runnable[1];
+        refreshPage[0] = () -> {
+            content.removeAllViews();
+            renderGuidePage(content, page[0]);
+            pageIndicator.setText((page[0] + 1) + " / 4");
+
+            boolean first = page[0] == 0;
+            boolean last = page[0] == 3;
+
+            previous.setTextColor(Color.parseColor(first ? "#B9B2CB" : "#5D5477"));
+            previous.setBackground(roundedBackground(
+                    Color.parseColor(first ? "#F4F5F8" : "#F6F9FD"),
+                    Color.parseColor("#D9E6F4"), 14));
+            previous.setEnabled(!first);
+            previous.setAlpha(first ? 0.6f : 1f);
+
+            next.setText(last ? "Done" : "Next");
+        };
+
+        previous.setOnClickListener(v -> {
+            if (page[0] > 0) {
+                audioManager.playButtonClick();
+                page[0]--;
+                refreshPage[0].run();
+            }
+        });
+
+        next.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            if (page[0] < 3) {
+                page[0]++;
+                refreshPage[0].run();
+            } else {
+                dialog.dismiss();
+            }
+        });
+
+        close.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            dialog.dismiss();
+        });
+
+        refreshPage[0].run();
+        displayDialog(dialog);
+    }
+
+    private void renderGuidePage(LinearLayout content, int pageIndex) {
+        if (pageIndex == 0) {
+            TextView title = label("Find the Different Tile", 18, "#30264D", true);
+            title.setGravity(Gravity.CENTER);
+            content.addView(title, fullWidth());
+
+            TextView shortText = label("Tap the TILE with the different SHADE", 13, "#6A6280", false);
+            shortText.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams shortParams = fullWidth();
+            shortParams.topMargin = dp(6);
+            content.addView(shortText, shortParams);
+
+            LinearLayout gridCard = new LinearLayout(this);
+            gridCard.setOrientation(LinearLayout.VERTICAL);
+            gridCard.setGravity(Gravity.CENTER);
+            gridCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+            gridCard.setBackground(roundedBackground(Color.parseColor("#F6FAFF"),
+                    Color.parseColor("#D9E6F4"), 16));
+            LinearLayout.LayoutParams gridParams = fullWidth();
+            gridParams.topMargin = dp(14);
+            content.addView(gridCard, gridParams);
+
+            for (int r = 0; r < 2; r++) {
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER);
+                LinearLayout.LayoutParams rowParams = fullWidth();
+                rowParams.topMargin = r == 0 ? 0 : dp(6);
+                gridCard.addView(row, rowParams);
+                for (int c = 0; c < 2; c++) {
+                    View tile = new View(this);
+                    boolean target = (r == 0 && c == 1);
+                    tile.setBackground(roundedBackground(
+                            Color.parseColor(target ? "#A77AE6" : "#D8C4F5"), 0, 10));
+                    LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+                    tileParams.setMargins(dp(4), 0, dp(4), 0);
+                    row.addView(tile, tileParams);
+                }
+            }
+
+            TextView hint = label("One tile is different", 12, "#7858C8", true);
+            hint.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams hintParams = fullWidth();
+            hintParams.topMargin = dp(10);
+            gridCard.addView(hint, hintParams);
+        } else if (pageIndex == 1) {
+            TextView title = label("Score and Time", 18, "#30264D", true);
+            title.setGravity(Gravity.CENTER);
+            content.addView(title, fullWidth());
+
+            LinearLayout badgeRow = new LinearLayout(this);
+            badgeRow.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams badgeParams = fullWidth();
+            badgeParams.topMargin = dp(14);
+            content.addView(badgeRow, badgeParams);
+
+            LinearLayout scoreCard = miniGuideCard("+1", "Correct Tap", "#F1EAFE", "#7858C8");
+            LinearLayout wrongCard = miniGuideCard("-1", "Wrong Tap (Hard Mode)", "#FFF1F1", "#D46060");
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            badgeRow.addView(scoreCard, cardParams);
+            LinearLayout.LayoutParams cardParams2 = new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            cardParams2.leftMargin = dp(8);
+            badgeRow.addView(wrongCard, cardParams2);
+
+            LinearLayout timerCard = new LinearLayout(this);
+            timerCard.setOrientation(LinearLayout.VERTICAL);
+            timerCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+            timerCard.setBackground(roundedBackground(Color.parseColor("#EEF7FF"), 0, 16));
+            LinearLayout.LayoutParams timerParams = fullWidth();
+            timerParams.topMargin = dp(12);
+            content.addView(timerCard, timerParams);
+
+            timerCard.addView(label("5 seconds for each level", 15, "#30264D", true), fullWidth());
+            View barBg = new View(this);
+            barBg.setBackground(roundedBackground(Color.parseColor("#DCE8F4"), 0, 6));
+            LinearLayout.LayoutParams barBgParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(10));
+            barBgParams.topMargin = dp(10);
+            timerCard.addView(barBg, barBgParams);
+            View barFill = new View(this);
+            barFill.setBackground(gradientBackground(new int[]{
+                    Color.parseColor("#F4BE63"), Color.parseColor("#E39A35")
+            }, 6, 0));
+            LinearLayout.LayoutParams barFillParams = new LinearLayout.LayoutParams(dp(120), dp(10));
+            barFillParams.topMargin = dp(-10);
+            timerCard.addView(barFill, barFillParams);
+        } else if (pageIndex == 2) {
+            TextView pill = label("EASY MODE", 16, "#365B82", true);
+            pill.setGravity(Gravity.CENTER);
+            pill.setPadding(dp(14), dp(9), dp(14), dp(9));
+            pill.setBackground(roundedBackground(Color.parseColor("#E8F6FF"), 0, 16));
+            content.addView(pill, fullWidth());
+
+            LinearLayout.LayoutParams rowParams = fullWidth();
+            rowParams.topMargin = dp(14);
+            content.addView(featureRow("◉", "Visible color difference", "#7858C8"), rowParams);
+            LinearLayout.LayoutParams rowParams2 = fullWidth();
+            rowParams2.topMargin = dp(10);
+            content.addView(featureRow("8", "Eight levels", "#5A9BD4"), rowParams2);
+            LinearLayout.LayoutParams rowParams3 = fullWidth();
+            rowParams3.topMargin = dp(10);
+            content.addView(featureRow("Ⅱ", "Pause after each level", "#7B6BD6"), rowParams3);
+            LinearLayout.LayoutParams rowParams4 = fullWidth();
+            rowParams4.topMargin = dp(10);
+            content.addView(featureRow("0", "Wrong tap: NO penalty", "#47A17C"), rowParams4);
+        } else {
+            TextView pill = label("HARD MODE", 16, "#7858C8", true);
+            pill.setGravity(Gravity.CENTER);
+            pill.setPadding(dp(14), dp(9), dp(14), dp(9));
+            pill.setBackground(roundedBackground(Color.parseColor("#F0E8FF"), 0, 16));
+            content.addView(pill, fullWidth());
+
+            LinearLayout.LayoutParams rowParams = fullWidth();
+            rowParams.topMargin = dp(14);
+            content.addView(featureRow("◐", "Colors get harder", "#7858C8"), rowParams);
+            LinearLayout.LayoutParams rowParams2 = fullWidth();
+            rowParams2.topMargin = dp(10);
+            content.addView(featureRow("➜", "Levels auto advance", "#5A9BD4"), rowParams2);
+            LinearLayout.LayoutParams rowParams3 = fullWidth();
+            rowParams3.topMargin = dp(10);
+            content.addView(featureRow("-1", "Wrong tap DEDUCTS 1 point", "#D46060"), rowParams3);
+            LinearLayout.LayoutParams rowParams4 = fullWidth();
+            rowParams4.topMargin = dp(10);
+            content.addView(featureRow("🏆", "Separate top 25 scores", "#C98B1B"), rowParams4);
+        }
+    }
+
+    private LinearLayout miniGuideCard(String bigText, String smallText,
+                                       String background, String textColor) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(10), dp(14), dp(10), dp(14));
+        card.setBackground(roundedBackground(Color.parseColor(background), 0, 14));
+        TextView big = label(bigText, 26, textColor, true);
+        big.setGravity(Gravity.CENTER);
+        card.addView(big, fullWidth());
+        TextView small = label(smallText, 11, "#5E5574", true);
+        small.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams smallParams = fullWidth();
+        smallParams.topMargin = dp(4);
+        card.addView(small, smallParams);
+        return card;
+    }
+
+    private LinearLayout featureRow(String iconText, String bodyText, String iconColor) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setBackground(roundedBackground(Color.parseColor("#FBFCFF"),
+                Color.parseColor("#E2E7F0"), 14));
+
+        TextView icon = label(iconText, 18, iconColor, true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(roundedBackground(Color.parseColor("#F4F7FB"), 0, 12));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
+
+        TextView body = label(bodyText, 14, "#30264D", true);
+        LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        bodyParams.leftMargin = dp(12);
+        row.addView(body, bodyParams);
+        return row;
     }
 
     /** Choose a mode before gameplay; the mode stays selected for this entire run. */

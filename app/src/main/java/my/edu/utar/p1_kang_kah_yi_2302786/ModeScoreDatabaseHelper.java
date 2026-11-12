@@ -46,6 +46,80 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Populate up to 25 example entries per mode, without overwriting or deleting
+     * previously saved player scores. A durable marker prevents reseeding even when
+     * sample entries later fall out of the Top 25.
+     *
+     * Call this after importLegacyScores(), so legacy user scores take priority.
+     */
+    public void seedInitialSampleScores() {
+        final String[] easyNames = {
+                "Demo Alex", "Demo Bella", "Demo Casey", "Demo Dylan", "Demo Eden",
+                "Demo Finn", "Demo Grace", "Demo Hugo", "Demo Iris", "Demo Jamie",
+                "Demo Kelly", "Demo Luca", "Demo Maya", "Demo Noah", "Demo Olive",
+                "Demo Parker", "Demo Quinn", "Demo Riley", "Demo Sage", "Demo Taylor",
+                "Demo Uma", "Demo Victor", "Demo Wren", "Demo Xander", "Demo Zoe"
+        };
+        final int[] easyScores = {
+                40, 38, 36, 34, 32, 30, 28, 26, 24, 22,
+                20, 18, 16, 14, 12, 11, 10, 9, 8, 7,
+                6, 5, 4, 3, 2
+        };
+        final String[] hardNames = {
+                "Demo Nova", "Demo Jett", "Demo Luna", "Demo Ash", "Demo Milo",
+                "Demo Cora", "Demo Reese", "Demo Dex", "Demo Robin", "Demo Lila",
+                "Demo Jasper", "Demo Mia", "Demo Arlo", "Demo Cleo", "Demo Beau",
+                "Demo Kira", "Demo Rory", "Demo Blair", "Demo June", "Demo Piper",
+                "Demo Remy", "Demo Ellis", "Demo Zane", "Demo Indie", "Demo Pax"
+        };
+        final int[] hardScores = {
+                24, 23, 22, 21, 20, 19, 18, 17, 16, 15,
+                14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
+                4, 3, 2, 1, 0
+        };
+
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            seedModeOnce(db, GameMode.EASY, easyNames, easyScores);
+            seedModeOnce(db, GameMode.HARD, hardNames, hardScores);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private void seedModeOnce(SQLiteDatabase db, GameMode mode,
+                              String[] names, int[] scores) {
+        if (names.length != LIMIT || scores.length != LIMIT) {
+            throw new IllegalArgumentException("Expected 25 sample names and scores");
+        }
+        String markerName = "demo_scores_v1_" + mode.key();
+        try (Cursor flag = db.rawQuery(
+                "SELECT name FROM migration_state WHERE name=?",
+                new String[]{markerName})) {
+            if (flag.moveToFirst()) return;
+        }
+
+        int currentCount = 0;
+        try (Cursor countCursor = db.rawQuery(
+                "SELECT COUNT(*) FROM mode_scores WHERE mode=?",
+                new String[]{mode.key()})) {
+            if (countCursor.moveToFirst()) currentCount = countCursor.getInt(0);
+        }
+        // Do not trim existing records to make room for sample entries.
+        int spaces = Math.max(0, LIMIT - currentCount);
+        for (int i = 0; i < spaces; i++) {
+            insertRow(db, names[i], scores[i], mode);
+        }
+
+        ContentValues marker = new ContentValues();
+        marker.put("name", markerName);
+        db.insertOrThrow("migration_state", null, marker);
+    }
+
+
+    /**
      * Copy existing pre-mode scores into Easy exactly once.
      * The original database is not modified or deleted. An empty legacy board
      * is also marked migrated, avoiding unwanted future duplicate imports.

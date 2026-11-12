@@ -242,6 +242,9 @@ public class MainActivity extends AppCompatActivity {
         ScoreDatabaseHelper legacyScores = new ScoreDatabaseHelper(this);
         try { scoreDatabase.importLegacyScores(legacyScores); }
         finally { legacyScores.close(); }
+        // Fill any available leaderboard slots with one-time demo scores.
+        // Existing scores are preserved, and demo entries are not re-added later.
+        scoreDatabase.seedInitialSampleScores();
         audioManager = new GameAudioManager(this);
 
         // Centered mode + level + score badges; no dividers or surrounding board panel.
@@ -440,7 +443,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (index != highlightedIndex) {
-            // Rate-limit incorrect-tap audio to avoid a noisy burst of sounds.
+            // A wrong tap has no score penalty in Easy Mode.
+            // In Hard Mode every wrong tap costs 1 point, but scores never go below zero.
+            if (gameMode == GameMode.HARD) {
+                totalScore = Math.max(0, totalScore - 1);
+                updateHeader();
+                animateScore();
+            }
+            // Rate-limit only the sound; each incorrect tap still counts in Hard Mode.
             long now = SystemClock.elapsedRealtime();
             if (now - lastWrongTapSoundMs >= 120L) {
                 audioManager.playWrongTap();
