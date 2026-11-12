@@ -156,6 +156,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences preferences;
     private ScoreDatabaseHelper scoreDatabase;
     private GameAudioManager audioManager;
+    private Boolean qualifiedAtFinish = null;
     private long lastWrongTapSoundMs = 0L;
     private static final String PREFS_NAME = "tap_target_settings";
     private static final String PREF_MUSIC = "music_enabled";
@@ -200,24 +201,35 @@ public class MainActivity extends AppCompatActivity {
         audioManager = new GameAudioManager(this);
 
         // Centered level + score badges; no dividers or surrounding board panel.
-        levelText.setBackground(roundedBackground(Color.parseColor("#E8EEF8"), 0, 50));
-        scoreLabel.setBackground(roundedBackground(Color.parseColor("#E8EEF8"), 0, 50));
+        levelText.setBackground(gradientBackground(new int[]{
+                Color.parseColor("#E6F7FF"), Color.parseColor("#EEE7FF")
+        }, 50, 0));
+        scoreLabel.setBackground(gradientBackground(new int[]{
+                Color.parseColor("#F0E7FF"), Color.parseColor("#E8F5FF")
+        }, 50, 0));
         // Keep the board transparent so the tiles sit directly on the page.
         boardContainer.setBackgroundColor(Color.TRANSPARENT);
-        timerTrack.setBackground(roundedBackground(Color.parseColor("#E2E8F0"), 0, 30));
-        timerFillDrawable = roundedBackground(Color.parseColor("#2563EB"), 0, 30);
+        timerTrack.setBackground(roundedBackground(Color.parseColor("#DCEBF4"), 0, 30));
+        timerFillDrawable = roundedBackground(Color.parseColor("#7858C8"), 0, 30);
         timerFill.setBackground(timerFillDrawable);
         styleHeaderButton(pauseButton);
         styleHeaderButton(settingsButton);
 
-        pauseButton.setOnClickListener(v -> pauseLevel());
-        settingsButton.setOnClickListener(v -> showSettingsDialog());
+        pauseButton.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            pauseLevel();
+        });
+        settingsButton.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            showSettingsDialog();
+        });
         timerTrack.post(this::updateTimerProgress);
         startNewGame();
     }
 
     private void startNewGame() {
         totalScore = 0;
+        qualifiedAtFinish = null;
         startLevel(0);
     }
 
@@ -232,7 +244,9 @@ public class MainActivity extends AppCompatActivity {
         // Only Level 1 needs the special "Are You Ready?" introduction.
         boolean firstLevel = newIndex == 0;
         state = firstLevel ? GameState.INTRO : GameState.PLAYING;
-        audioManager.setMusicActive(true);
+        audioManager.setMusicMode(GameAudioManager.MusicMode.GAME);
+        // Intro has racing-style beeps only; game music starts after START!
+        audioManager.setMusicActive(!firstLevel);
         pauseButton.setEnabled(!firstLevel);
         settingsButton.setEnabled(!firstLevel);
         introOverlay.setVisibility(firstLevel ? View.VISIBLE : View.GONE);
@@ -268,15 +282,21 @@ public class MainActivity extends AppCompatActivity {
             introOverlay.setVisibility(View.GONE);
             introRunnable = null;
             state = GameState.PLAYING;
+            audioManager.setMusicActive(true);
             startCountdown();
             return;
         }
+
+        // Countdown timing is synchronized with the visible 3, 2, 1 and START.
+        // No effect on READY; the three numbers receive beeps, then a GO sound.
+        if (step >= 1 && step <= 3) audioManager.playCountdownBeep();
+        if (step == 4) audioManager.playCountdownGo();
 
         final String[] messages = {"READY", "3", "2", "1", "START!"};
         introTitle.setText(step == 0 ? "ARE YOU READY!" :
                 (step == 4 ? "LET'S GO!" : "GET READY"));
         introNumber.setText(messages[step]);
-        introNumber.setTextColor(Color.parseColor(step == 4 ? "#16A34A" : "#2563EB"));
+        introNumber.setTextColor(Color.parseColor(step == 4 ? "#59A3C7" : "#7858C8"));
         introHint.setText(step == 0
                 ? "Find the tile with a different shade."
                 : step == 4 ? "Tap as fast as you can!" : "Focus on the colors");
@@ -469,9 +489,9 @@ public class MainActivity extends AppCompatActivity {
     // The four dialogs below share one custom, light-themed layout.
     private void showPauseDialog() {
         showStyledDialog(
-                "Ⅱ", "GAME PAUSED", "Take a break",
-                "Your remaining time is saved until you resume.",
-                Color.parseColor("#2563EB"), Color.parseColor("#DBEAFE"),
+                "Ⅱ", null, "GAME PAUSED",
+                null,
+                Color.parseColor("#7858C8"), Color.parseColor("#E3F4FC"),
                 new String[]{"LEVEL", "SCORE", "TIME LEFT"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore), formatSeconds(timeRemainingMs)},
@@ -498,10 +518,9 @@ public class MainActivity extends AppCompatActivity {
         int nextSize = lastLevel ? 0 : levels.get(levelIndex + 1).gridSize;
 
         showStyledDialog(
-                "✓", "LEVEL COMPLETE", "Level " + (levelIndex + 1) + " cleared!",
-                lastLevel ? "You finished all " + levels.size() + " levels!"
-                        : "Great job! Ready for the next color challenge?",
-                Color.parseColor("#15803D"), Color.parseColor("#DCFCE7"),
+                "✓", null, "Level " + (levelIndex + 1) + " cleared!",
+                null,
+                Color.parseColor("#527DB8"), Color.parseColor("#E0F4FD"),
                 new String[]{"LEVEL", "TOTAL SCORE", lastLevel ? "STATUS" : "NEXT GRID"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore), lastLevel ? "Done" : nextSize + " x " + nextSize},
@@ -522,9 +541,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void confirmEndGame(Runnable returnToPreviousDialog) {
         showStyledDialog(
-                "!", "CONFIRM ACTION", "End your game?",
-                "Your current score will be finalized. This cannot be undone.",
-                Color.parseColor("#DC2626"), Color.parseColor("#FEE2E2"),
+                "!", null, "End your game?",
+                null,
+                Color.parseColor("#CB5879"), Color.parseColor("#FFE8F0"),
                 new String[]{"CURRENT LEVEL", "TOTAL SCORE"},
                 new String[]{String.valueOf(levelIndex + 1), String.valueOf(totalScore)},
                 "Keep playing", returnToPreviousDialog,
@@ -535,14 +554,23 @@ public class MainActivity extends AppCompatActivity {
     private void endGame() {
         stopCountdown();
         state = GameState.GAME_OVER;
-        audioManager.setMusicActive(false);
+        // After a game finishes, return to the calm Home/Results soundtrack.
+        audioManager.setMusicMode(GameAudioManager.MusicMode.MENU);
+        audioManager.setMusicActive(true);
+        qualifiedAtFinish = null;
+        try {
+            qualifiedAtFinish = scoreDatabase.qualifies(totalScore);
+            if (qualifiedAtFinish) audioManager.playCongratulations();
+        } catch (SQLiteException error) {
+            // Results can still show the existing database error dialog later.
+        }
         pauseButton.setEnabled(false);
         settingsButton.setEnabled(false);
 
         showStyledDialog(
-                "★", "RUN COMPLETE", "Game over",
-                "Nice effort! You reached Level " + (levelIndex + 1) + ".",
-                Color.parseColor("#7C3AED"), Color.parseColor("#EDE9FE"),
+                "★", null, "Game over",
+                null,
+                Color.parseColor("#E6AC29"), Color.parseColor("#FFF3CD"),
                 new String[]{"LEVEL REACHED", "FINAL SCORE"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore)},
@@ -556,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
     // Unqualified scores still lead to the Top 25 table, without a name prompt.
     private void showPostGameResults() {
         try {
-            if (scoreDatabase.qualifies(totalScore)) {
+            if (qualifiedAtFinish != null ? qualifiedAtFinish : scoreDatabase.qualifies(totalScore)) {
                 showNameEntryDialog();
             } else {
                 showLeaderboardDialog();
@@ -576,39 +604,35 @@ public class MainActivity extends AppCompatActivity {
         card.setBackground(roundedBackground(Color.WHITE, 0, 24));
 
         TextView title = makeText("🏆  TOP 25 SCORE!", 21,
-                Color.parseColor("#0F172A"), true);
+                Color.parseColor("#30264D"), true);
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView subtitle = makeText("Your score of " + totalScore
-                        + " qualifies! Enter a name to save it on this device.",
-                14, Color.parseColor("#64748B"), false);
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subtitleParams = fullWidth();
-        subtitleParams.topMargin = dp(10);
-        card.addView(subtitle, subtitleParams);
+        TextView scoreBadge = makeText("Score: " + totalScore, 18,
+                Color.parseColor("#7858C8"), true);
+        scoreBadge.setGravity(Gravity.CENTER);
+        scoreBadge.setPadding(dp(14), dp(9), dp(14), dp(9));
+        scoreBadge.setBackground(roundedBackground(Color.parseColor("#F1EDFC"), 0, 14));
+        LinearLayout.LayoutParams scoreBadgeParams = fullWidth();
+        scoreBadgeParams.topMargin = dp(12);
+        card.addView(scoreBadge, scoreBadgeParams);
 
         EditText nameInput = new EditText(this);
         nameInput.setSingleLine(true);
         nameInput.setHint("Your name");
         nameInput.setTextSize(16);
-        nameInput.setTextColor(Color.parseColor("#0F172A"));
-        nameInput.setHintTextColor(Color.parseColor("#94A3B8"));
+        nameInput.setTextColor(Color.parseColor("#30264D"));
+        nameInput.setHintTextColor(Color.parseColor("#9F96B8"));
         nameInput.setInputType(InputType.TYPE_CLASS_TEXT |
                 InputType.TYPE_TEXT_FLAG_CAP_WORDS);
         nameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(20)});
-        nameInput.setBackground(roundedBackground(Color.parseColor("#F8FAFC"),
-                Color.parseColor("#CBD5E1"), 12));
+        nameInput.setBackground(roundedBackground(Color.parseColor("#F8F6FF"),
+                Color.parseColor("#D3C9E7"), 12));
         nameInput.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout.LayoutParams inputParams = fullWidth();
-        inputParams.topMargin = dp(22);
+        inputParams.topMargin = dp(14);
         card.addView(nameInput, inputParams);
 
-        TextView helper = makeText("Up to 20 characters · Names cannot be blank",
-                12, Color.parseColor("#64748B"), false);
-        LinearLayout.LayoutParams helperParams = fullWidth();
-        helperParams.topMargin = dp(8);
-        card.addView(helper, helperParams);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(false).create();
@@ -619,6 +643,7 @@ public class MainActivity extends AppCompatActivity {
         saveParams.topMargin = dp(20);
         card.addView(save, saveParams);
         save.setOnClickListener(v -> {
+            audioManager.playButtonClick();
             String name = nameInput.getText().toString().trim();
             if (name.isEmpty()) {
                 nameInput.setError("Please enter your name");
@@ -643,6 +668,7 @@ public class MainActivity extends AppCompatActivity {
         skipParams.topMargin = dp(9);
         card.addView(skip, skipParams);
         skip.setOnClickListener(v -> {
+            audioManager.playButtonClick();
             dialog.dismiss();
             showLeaderboardDialog();
         });
@@ -665,23 +691,19 @@ public class MainActivity extends AppCompatActivity {
         card.setBackground(roundedBackground(Color.WHITE, 0, 24));
 
         TextView title = makeText("🏆  TOP 25 SCORES", 21,
-                Color.parseColor("#0F172A"), true);
+                Color.parseColor("#30264D"), true);
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView subtitle = makeText("Highest scores saved on this phone",
-                12, Color.parseColor("#64748B"), false);
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subParams = fullWidth();
-        subParams.topMargin = dp(6);
-        card.addView(subtitle, subParams);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
         scroll.setVerticalScrollBarEnabled(true);
+        int maxListHeight = Math.min(dp(390),
+                (int) (getResources().getDisplayMetrics().heightPixels * 0.46f));
+        int contentHeight = entries.isEmpty() ? dp(110) : dp(54 * entries.size());
         LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                Math.min(dp(390), (int) (getResources().getDisplayMetrics().heightPixels * 0.46f)));
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.min(maxListHeight, contentHeight));
         scrollParams.topMargin = dp(15);
         card.addView(scroll, scrollParams);
 
@@ -692,7 +714,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (entries.isEmpty()) {
             TextView empty = makeText("No scores yet. Play a round to set a record!",
-                    14, Color.parseColor("#64748B"), false);
+                    14, Color.parseColor("#716A8E"), false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(18), dp(30), dp(18), dp(30));
             rows.addView(empty, fullWidth());
@@ -704,23 +726,23 @@ public class MainActivity extends AppCompatActivity {
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(dp(11), dp(12), dp(11), dp(12));
                 row.setBackground(roundedBackground(
-                        i % 2 == 0 ? Color.parseColor("#F1F5F9") : Color.WHITE,
+                        i % 2 == 0 ? Color.parseColor("#F1EDFC") : Color.WHITE,
                         0, 10));
 
                 TextView rank = makeText(String.format(Locale.US, "%02d", i + 1),
-                        13, Color.parseColor("#2563EB"), true);
+                        13, Color.parseColor("#7858C8"), true);
                 row.addView(rank, new LinearLayout.LayoutParams(dp(35),
                         ViewGroup.LayoutParams.WRAP_CONTENT));
 
                 TextView name = makeText(score.name, 14,
-                        Color.parseColor("#0F172A"), false);
+                        Color.parseColor("#30264D"), false);
                 name.setSingleLine(true);
                 name.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 row.addView(name, new LinearLayout.LayoutParams(0,
                         ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
                 TextView points = makeText(String.valueOf(score.score), 16,
-                        Color.parseColor("#0F172A"), true);
+                        Color.parseColor("#30264D"), true);
                 points.setGravity(Gravity.END);
                 row.addView(points, new LinearLayout.LayoutParams(dp(65),
                         ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -740,6 +762,7 @@ public class MainActivity extends AppCompatActivity {
         playAgainParams.topMargin = dp(18);
         card.addView(playAgain, playAgainParams);
         playAgain.setOnClickListener(v -> {
+            audioManager.playButtonClick();
             dialog.dismiss();
             startNewGame();
         });
@@ -750,6 +773,7 @@ public class MainActivity extends AppCompatActivity {
         closeParams.topMargin = dp(8);
         card.addView(close, closeParams);
         close.setOnClickListener(v -> {
+            audioManager.playButtonClick();
             dialog.dismiss();
             returnToHome();
         });
@@ -770,14 +794,13 @@ public class MainActivity extends AppCompatActivity {
     private void showLeaderboardErrorDialog() {
         showStyledDialog("!", "SCORE ERROR", "Couldn't load scores",
                 "Your game score hasn't been saved. You can retry opening the leaderboard.",
-                Color.parseColor("#DC2626"), Color.parseColor("#FEE2E2"),
+                Color.parseColor("#CB5879"), Color.parseColor("#FFE8F0"),
                 new String[]{"CURRENT SCORE"}, new String[]{String.valueOf(totalScore)},
                 "Try again", this::showPostGameResults,
                 "Play again", this::startNewGame, false);
     }
 
-    // SETTINGS: choices are saved now, but music/sound playback will be
-    // connected to these booleans in a future enhancement.
+    // SETTINGS: the switches directly control both music tracks and all SFX.
     private void showSettingsDialog() {
         if (state != GameState.PLAYING || !countdownStarted) return;
 
@@ -795,28 +818,15 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(22), dp(24), dp(22), dp(22));
+        card.setPadding(dp(20), dp(16), dp(20), dp(16));
         card.setBackground(roundedBackground(Color.WHITE, 0, 24));
 
-        TextView heading = makeText("GAME SETTINGS", 23, Color.parseColor("#0F172A"), true);
+        TextView heading = makeText("GAME SETTINGS", 21, Color.parseColor("#30264D"), true);
+        heading.setGravity(Gravity.CENTER);
         card.addView(heading, fullWidth());
 
-        TextView description = makeText(
-                "Adjust the music and sound effects while your game is paused.",
-                13, Color.parseColor("#64748B"), false);
-        description.setLineSpacing(dp(3), 1f);
-        LinearLayout.LayoutParams descriptionParams = fullWidth();
-        descriptionParams.topMargin = dp(10);
-        card.addView(description, descriptionParams);
-
-        addSettingsSwitch(card, "Music", "Play looping background music", PREF_MUSIC);
-        addSettingsSwitch(card, "Sound effects", "Play tap and level-complete sounds", PREF_SFX);
-
-        TextView note = makeText("Your game is paused while settings are open.",
-                12, Color.parseColor("#64748B"), false);
-        LinearLayout.LayoutParams noteParams = fullWidth();
-        noteParams.topMargin = dp(20);
-        card.addView(note, noteParams);
+        addSettingsSwitch(card, "Music", PREF_MUSIC);
+        addSettingsSwitch(card, "Sound effects", PREF_SFX);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card)
@@ -826,10 +836,11 @@ public class MainActivity extends AppCompatActivity {
 
         TextView close = makeDialogButton("Save & resume", true, false);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
-        closeParams.topMargin = dp(18);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        closeParams.topMargin = dp(12);
         card.addView(close, closeParams);
         close.setOnClickListener(v -> {
+            audioManager.playButtonClick();
             dialog.dismiss();
             resumeLevel();
         });
@@ -838,12 +849,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addSettingsSwitch(LinearLayout card,
-                                   String title, String subtitle, String preferenceKey) {
+                                   String title, String preferenceKey) {
         LinearLayout line = new LinearLayout(this);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams lineParams = fullWidth();
-        lineParams.topMargin = dp(22);
+        lineParams.topMargin = dp(10);
         card.addView(line, lineParams);
 
         LinearLayout labels = new LinearLayout(this);
@@ -851,18 +862,20 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         line.addView(labels, labelsParams);
-        labels.addView(makeText(title, 16, Color.parseColor("#0F172A"), true));
-        TextView description = makeText(subtitle, 11, Color.parseColor("#64748B"), false);
-        LinearLayout.LayoutParams subtitleParams = fullWidth();
-        subtitleParams.topMargin = dp(3);
-        labels.addView(description, subtitleParams);
-
+        labels.addView(makeText(title, 16, Color.parseColor("#30264D"), true));
         SwitchCompat toggle = new SwitchCompat(this);
         toggle.setContentDescription(title);
+        toggle.setThumbTintList(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.parseColor("#7858C8"), Color.parseColor("#C9C4D5")}));
+        toggle.setTrackTintList(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.parseColor("#DACDF5"), Color.parseColor("#E4E1EA")}));
         toggle.setChecked(preferences.getBoolean(preferenceKey, true));
         toggle.setOnCheckedChangeListener((button, value) -> {
             preferences.edit().putBoolean(preferenceKey, value).apply();
             audioManager.refreshPreferences();
+            audioManager.playButtonClick(); // Silence when SFX is switched off.
         });
         LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -872,9 +885,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void styleHeaderButton(ImageButton button) {
         button.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(Color.parseColor("#1E2563EB")),
-                roundedBackground(Color.WHITE, Color.parseColor("#E2E8F0"), 15), null));
-        button.setImageTintList(ColorStateList.valueOf(Color.parseColor("#334155")));
+                ColorStateList.valueOf(Color.parseColor("#227858C8")),
+                gradientBackground(new int[]{
+                        Color.parseColor("#FFFFFF"), Color.parseColor("#E7F5FF")
+                }, 15, Color.parseColor("#DCEBF4")), null));
+        button.setImageTintList(ColorStateList.valueOf(Color.parseColor("#50456B")));
         button.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
         button.setPadding(dp(11), dp(11), dp(11), dp(11));
     }
@@ -892,9 +907,9 @@ public class MainActivity extends AppCompatActivity {
             params.width = newWidth;
             timerFill.setLayoutParams(params);
         }
-        int progressColor = fraction > 0.50f ? Color.parseColor("#2563EB")
-                : fraction > 0.20f ? Color.parseColor("#F59E0B")
-                : Color.parseColor("#EF4444");
+        int progressColor = fraction > 0.50f ? Color.parseColor("#70B9DC")
+                : fraction > 0.20f ? Color.parseColor("#E7A651")
+                : Color.parseColor("#DF7485");
         timerFillDrawable.setColor(progressColor);
     }
 
@@ -948,25 +963,32 @@ public class MainActivity extends AppCompatActivity {
         symbolParams.gravity = Gravity.CENTER_HORIZONTAL;
         card.addView(symbolView, symbolParams);
 
-        TextView eyebrowView = makeText(eyebrow, 11, accentColor, true);
-        eyebrowView.setLetterSpacing(0.12f);
-        eyebrowView.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams eyebrowParams = fullWidth();
-        eyebrowParams.topMargin = dp(16);
-        card.addView(eyebrowView, eyebrowParams);
+        // Optional eyebrow and description: skip them entirely when hidden.
+        boolean showEyebrow = eyebrow != null && !eyebrow.trim().isEmpty();
+        if (showEyebrow) {
+            TextView eyebrowView = makeText(eyebrow, 11, accentColor, true);
+            eyebrowView.setLetterSpacing(0.12f);
+            eyebrowView.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams eyebrowParams = fullWidth();
+            eyebrowParams.topMargin = dp(14);
+            card.addView(eyebrowView, eyebrowParams);
+        }
 
-        TextView titleView = makeText(title, 23, Color.parseColor("#0F172A"), true);
+        TextView titleView = makeText(title, 23, Color.parseColor("#30264D"), true);
         titleView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = fullWidth();
-        titleParams.topMargin = dp(5);
+        titleParams.topMargin = dp(showEyebrow ? 5 : 12);
         card.addView(titleView, titleParams);
 
-        TextView subtitleView = makeText(description, 14, Color.parseColor("#64748B"), false);
-        subtitleView.setGravity(Gravity.CENTER);
-        subtitleView.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams subtitleParams = fullWidth();
-        subtitleParams.topMargin = dp(9);
-        card.addView(subtitleView, subtitleParams);
+        if (description != null && !description.trim().isEmpty()) {
+            TextView subtitleView = makeText(description, 14,
+                    Color.parseColor("#716A8E"), false);
+            subtitleView.setGravity(Gravity.CENTER);
+            subtitleView.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams subtitleParams = fullWidth();
+            subtitleParams.topMargin = dp(8);
+            card.addView(subtitleView, subtitleParams);
+        }
 
         if (metricLabels.length != metricValues.length) {
             throw new IllegalArgumentException("Metric labels and values must match");
@@ -974,7 +996,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout statsRow = new LinearLayout(this);
         statsRow.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams statsRowParams = fullWidth();
-        statsRowParams.topMargin = dp(20);
+        statsRowParams.topMargin = dp(18);
         card.addView(statsRow, statsRowParams);
 
         for (int i = 0; i < metricLabels.length; i++) {
@@ -982,13 +1004,13 @@ public class MainActivity extends AppCompatActivity {
             statCard.setOrientation(LinearLayout.VERTICAL);
             statCard.setGravity(Gravity.CENTER);
             statCard.setPadding(dp(4), dp(13), dp(4), dp(13));
-            statCard.setBackground(roundedBackground(Color.parseColor("#F1F5F9"), 0, 13));
+            statCard.setBackground(roundedBackground(Color.parseColor("#F1EDFC"), 0, 13));
 
-            TextView statValue = makeText(metricValues[i], 18, Color.parseColor("#0F172A"), true);
+            TextView statValue = makeText(metricValues[i], 18, Color.parseColor("#30264D"), true);
             statValue.setGravity(Gravity.CENTER);
             statCard.addView(statValue, fullWidth());
 
-            TextView statLabel = makeText(metricLabels[i], 9, Color.parseColor("#64748B"), true);
+            TextView statLabel = makeText(metricLabels[i], 9, Color.parseColor("#716A8E"), true);
             statLabel.setGravity(Gravity.CENTER);
             statLabel.setLetterSpacing(0.04f);
             LinearLayout.LayoutParams labelParams = fullWidth();
@@ -1010,9 +1032,10 @@ public class MainActivity extends AppCompatActivity {
         TextView primaryButton = makeDialogButton(primaryLabel, true, false);
         LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
-        primaryParams.topMargin = dp(22);
+        primaryParams.topMargin = dp(18);
         card.addView(primaryButton, primaryParams);
         primaryButton.setOnClickListener(view -> {
+            audioManager.playButtonClick();
             dialog.dismiss();
             primaryAction.run();
         });
@@ -1024,6 +1047,7 @@ public class MainActivity extends AppCompatActivity {
             secondaryParams.topMargin = dp(9);
             card.addView(secondaryButton, secondaryParams);
             secondaryButton.setOnClickListener(view -> {
+                audioManager.playButtonClick();
                 dialog.dismiss();
                 secondaryAction.run();
             });
@@ -1036,6 +1060,7 @@ public class MainActivity extends AppCompatActivity {
             tertiaryParams.topMargin = dp(9);
             card.addView(tertiaryButton, tertiaryParams);
             tertiaryButton.setOnClickListener(view -> {
+                audioManager.playButtonClick();
                 dialog.dismiss();
                 tertiaryAction.run();
             });
@@ -1071,17 +1096,28 @@ public class MainActivity extends AppCompatActivity {
 
     private TextView makeDialogButton(String label, boolean primary, boolean danger) {
         TextView button = makeText(label, 15,
-                primary ? Color.WHITE : danger ? Color.parseColor("#DC2626")
-                        : Color.parseColor("#334155"), true);
+                primary ? Color.WHITE : danger ? Color.parseColor("#CB5879")
+                        : Color.parseColor("#50456B"), true);
         button.setGravity(Gravity.CENTER);
         button.setClickable(true);
         button.setFocusable(true);
         button.setContentDescription(label);
 
-        int fill = primary ? Color.parseColor("#2563EB") : Color.WHITE;
-        int stroke = primary ? 0 : danger ? Color.parseColor("#FECACA")
-                : Color.parseColor("#CBD5E1");
-        GradientDrawable background = roundedBackground(fill, stroke, 14);
+        // Primary buttons: lavender -> purple. Secondary: soft white -> ice blue.
+        // Destructive actions retain a gentle rose tint rather than appearing blue.
+        GradientDrawable background;
+        if (primary) {
+            background = gradientBackground(new int[]{
+                    Color.parseColor("#A18AEC"), Color.parseColor("#7858C8")}, 14, 0);
+        } else if (danger) {
+            background = gradientBackground(new int[]{
+                    Color.parseColor("#FFFFFF"), Color.parseColor("#FFF0F5")},
+                    14, Color.parseColor("#F0C5D5"));
+        } else {
+            background = gradientBackground(new int[]{
+                    Color.parseColor("#FFFFFF"), Color.parseColor("#EDF6FF")},
+                    14, Color.parseColor("#D3C9E7"));
+        }
         button.setBackground(new RippleDrawable(
                 ColorStateList.valueOf(Color.parseColor("#220F172A")), background, null));
         return button;
@@ -1090,6 +1126,17 @@ public class MainActivity extends AppCompatActivity {
     private GradientDrawable roundedBackground(int fillColor, int strokeColor, int cornerDp) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fillColor);
+        drawable.setCornerRadius(dp(cornerDp));
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        return drawable;
+    }
+
+
+    // Programmatic gradients keep custom dialog buttons consistent with Home.
+    private GradientDrawable gradientBackground(int[] colors, int cornerDp, int strokeColor) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR, colors);
+        drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setCornerRadius(dp(cornerDp));
         if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
         return drawable;

@@ -2,31 +2,31 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8FAFC">
+    android:background="@drawable/bg_game_gradient">
 
+    <!-- The game board and all header elements sit directly on the light page. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingLeft="16dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:paddingTop="12dp"
-        android:paddingRight="16dp"
-        android:paddingBottom="12dp">
+        android:paddingBottom="14dp">
 
-        <!-- Top controls: Pause / Title / Settings. -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
             <ImageButton
                 android:id="@+id/pauseButton"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:contentDescription="Pause game"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:src="@drawable/ic_pause"
-                android:scaleType="centerInside" />
+                android:contentDescription="Pause game"
+                android:background="@android:color/transparent" />
 
             <TextView
                 android:layout_width="0dp"
@@ -34,105 +34,92 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:text="TAP THE TARGET"
-                android:textColor="#0F172A"
-                android:textSize="19sp"
-                android:textStyle="bold" />
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="#30264D" />
 
             <ImageButton
                 android:id="@+id/settingsButton"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:contentDescription="Game settings"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:src="@drawable/ic_settings"
-                android:scaleType="centerInside" />
+                android:contentDescription="Game settings"
+                android:background="@android:color/transparent" />
         </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center"
-            android:text="Spot the different shade"
-            android:textColor="#64748B"
-            android:textSize="12sp" />
-
-        <!-- Centered current-level pill. Rounded background is applied in Java. -->
+        <!-- Centered level pill -->
         <TextView
             android:id="@+id/levelText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="18dp"
-            android:paddingLeft="20dp"
+            android:layout_marginTop="12dp"
+            android:paddingStart="19dp"
+            android:paddingEnd="19dp"
             android:paddingTop="7dp"
-            android:paddingRight="20dp"
             android:paddingBottom="7dp"
-            android:gravity="center"
             android:text="Level 1/8"
-            android:textColor="#0F172A"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#30264D" />
 
-        <!-- Large central score, without any vertical divider lines. -->
         <TextView
             android:id="@+id/scoreLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="17dp"
-            android:paddingLeft="12dp"
-            android:paddingTop="4dp"
-            android:paddingRight="12dp"
-            android:paddingBottom="4dp"
-            android:gravity="center"
+            android:layout_marginTop="12dp"
+            android:paddingStart="13dp"
+            android:paddingEnd="13dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
             android:text="TOTAL SCORE"
-            android:textColor="#475569"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#50456B" />
 
         <TextView
             android:id="@+id/scoreText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
             android:gravity="center"
-            android:includeFontPadding="false"
             android:text="0"
-            android:textColor="#2563EB"
-            android:textSize="64sp"
-            android:textStyle="bold" />
+            android:textSize="56sp"
+            android:textStyle="bold"
+            android:textColor="#7858C8" />
 
-        <!-- Timer and shrinking progress bar above the tiles. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginTop="13dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="TIME REMAINING"
-                android:textColor="#475569"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#50456B" />
 
             <TextView
                 android:id="@+id/timerText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="5.0s"
-                android:textColor="#0F172A"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#30264D" />
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/timerTrack"
             android:layout_width="match_parent"
-            android:layout_height="12dp"
-            android:layout_marginTop="8dp">
+            android:layout_height="11dp"
+            android:layout_marginTop="9dp">
 
             <View
                 android:id="@+id/timerFill"
@@ -140,14 +127,14 @@
                 android:layout_height="match_parent" />
         </FrameLayout>
 
-        <!-- Borderless, transparent board: the tiles sit on the page background. -->
-        <!-- Remaining space is used to center the responsive grid. -->
+        <!-- No outer card or border around the grid. Java sizes it to available space. -->
         <FrameLayout
             android:id="@+id/boardContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="16dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:background="@android:color/transparent">
 
             <GridLayout
                 android:id="@+id/gameGrid"
@@ -159,24 +146,23 @@
         </FrameLayout>
     </LinearLayout>
 
-    <!-- Translucent Level 1 countdown overlay: the 2 x 2 board stays visible beneath it. -->
-    <!-- 99 is the alpha value (about 60% opaque); lower it to 66 for more visibility. -->
+    <!-- Semi-transparent intro: Level 1 tiles remain visible underneath. -->
     <FrameLayout
         android:id="@+id/introOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#99F8FAFC"
-        android:visibility="gone"
+        android:background="#A6F8F6FF"
         android:clickable="true"
-        android:focusable="true">
+        android:focusable="true"
+        android:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:gravity="center"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:gravity="center"
+            android:padding="20dp">
 
             <TextView
                 android:id="@+id/introTitle"
@@ -184,28 +170,30 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:text="ARE YOU READY!"
-                android:textColor="#0F172A"
-                android:textSize="25sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textSize="23sp"
+                android:textColor="#30264D" />
 
             <TextView
                 android:id="@+id/introNumber"
                 android:layout_width="match_parent"
-                android:layout_height="150dp"
+                android:layout_height="wrap_content"
                 android:gravity="center"
+                android:layout_marginTop="8dp"
                 android:text="READY"
-                android:textColor="#2563EB"
-                android:textSize="66sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textSize="76sp"
+                android:textColor="#7858C8" />
 
             <TextView
                 android:id="@+id/introHint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="Find the tile with a different shade."
-                android:textColor="#64748B"
-                android:textSize="15sp" />
+                android:layout_marginTop="6dp"
+                android:text="Focus on the colors"
+                android:textSize="13sp"
+                android:textColor="#716A8E" />
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>

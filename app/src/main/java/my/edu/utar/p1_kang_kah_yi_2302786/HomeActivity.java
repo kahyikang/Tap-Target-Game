@@ -51,10 +51,15 @@ public class HomeActivity extends AppCompatActivity {
         scoreDatabase = new ScoreDatabaseHelper(this);
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         audioManager = new GameAudioManager(this);
+        audioManager.setMusicMode(GameAudioManager.MusicMode.MENU);
         audioManager.setMusicActive(true);
 
         ImageView logo = findViewById(R.id.homeLogo);
-        logo.setBackground(roundedBackground(Color.parseColor("#DBEAFE"), 0, 24));
+        // A soft ice-blue/lilac accent behind the logo.
+        logo.setBackground(gradientBackground(new int[]{
+                Color.parseColor("#DDF3FF"), Color.parseColor("#E9DFFF")
+        }, 24, 0));
+        logo.setColorFilter(Color.parseColor("#7858C8"));
         View play = findViewById(R.id.playButton);
         View leaderboard = findViewById(R.id.leaderboardButton);
         View settings = findViewById(R.id.homeSettingsButton);
@@ -63,9 +68,18 @@ public class HomeActivity extends AppCompatActivity {
         styleButton(leaderboard, false);
         styleButton(settings, false);
 
-        play.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class)));
-        leaderboard.setOnClickListener(v -> showLeaderboardDialog());
-        settings.setOnClickListener(v -> showSettingsDialog());
+        play.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            startActivity(new Intent(this, MainActivity.class));
+        });
+        leaderboard.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            showLeaderboardDialog();
+        });
+        settings.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            showSettingsDialog();
+        });
     }
 
     /** Builds a scrollable list using the SAME database as the game-over flow. */
@@ -79,21 +93,18 @@ public class HomeActivity extends AppCompatActivity {
         }
 
         LinearLayout card = dialogCard();
-        TextView title = label("🏆  TOP 25 SCORES", 22, "#0F172A", true);
+        TextView title = label("🏆  TOP 25 SCORES", 22, "#30264D", true);
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView subtitle = label("Best scores on this device", 13, "#64748B", false);
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subtitleParams = fullWidth();
-        subtitleParams.topMargin = dp(6);
-        card.addView(subtitle, subtitleParams);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
+        int maxListHeight = Math.min(dp(390),
+                (int) (getResources().getDisplayMetrics().heightPixels * 0.47f));
+        int contentHeight = scores.isEmpty() ? dp(110) : dp(54 * scores.size());
         LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                Math.min(dp(390), (int) (getResources().getDisplayMetrics().heightPixels * 0.47f)));
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.min(maxListHeight, contentHeight));
         scrollParams.topMargin = dp(18);
         card.addView(scroll, scrollParams);
 
@@ -104,7 +115,7 @@ public class HomeActivity extends AppCompatActivity {
 
         if (scores.isEmpty()) {
             TextView empty = label("No scores yet. Play your first game!",
-                    14, "#64748B", false);
+                    14, "#716A8E", false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(8), dp(48), dp(8), dp(48));
             rows.addView(empty, fullWidth());
@@ -116,21 +127,21 @@ public class HomeActivity extends AppCompatActivity {
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(dp(12), dp(13), dp(12), dp(13));
                 row.setBackground(roundedBackground(
-                        i % 2 == 0 ? Color.parseColor("#F1F5F9") : Color.WHITE,
+                        i % 2 == 0 ? Color.parseColor("#F1EDFC") : Color.WHITE,
                         0, 10));
 
                 TextView rank = label(String.format(Locale.US, "%02d", i + 1),
-                        14, "#2563EB", true);
+                        14, "#7858C8", true);
                 row.addView(rank, new LinearLayout.LayoutParams(dp(37),
                         ViewGroup.LayoutParams.WRAP_CONTENT));
 
-                TextView player = label(entry.name, 14, "#0F172A", false);
+                TextView player = label(entry.name, 14, "#30264D", false);
                 player.setSingleLine(true);
                 player.setEllipsize(TextUtils.TruncateAt.END);
                 row.addView(player, new LinearLayout.LayoutParams(
                         0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-                TextView value = label(String.valueOf(entry.score), 16, "#0F172A", true);
+                TextView value = label(String.valueOf(entry.score), 16, "#30264D", true);
                 value.setGravity(Gravity.END);
                 row.addView(value, new LinearLayout.LayoutParams(
                         dp(58), ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -148,64 +159,66 @@ public class HomeActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
         closeParams.topMargin = dp(18);
         card.addView(close, closeParams);
-        close.setOnClickListener(v -> dialog.dismiss());
+        close.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            dialog.dismiss();
+        });
         displayDialog(dialog);
     }
 
     /** Preferences directly control live audio playback. */
     private void showSettingsDialog() {
         LinearLayout card = dialogCard();
-        TextView title = label("GAME SETTINGS", 23, "#0F172A", true);
+        // Compact padding for Settings only (does not affect the Leaderboard).
+        card.setPadding(dp(20), dp(16), dp(20), dp(16));
+        TextView title = label("GAME SETTINGS", 21, "#30264D", true);
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView description = label(
-                "Music plays on the menu and during gameplay. Sound effects play when you tap tiles.",
-                13, "#64748B", false);
-        description.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams descParams = fullWidth();
-        descParams.topMargin = dp(9);
-        card.addView(description, descParams);
-
-        addSettingsSwitch(card, "Music", "Looping background music", PREF_MUSIC);
-        addSettingsSwitch(card, "Sound effects", "Correct/wrong tap and level sounds", PREF_SFX);
+        addSettingsSwitch(card, "Music", PREF_MUSIC);
+        addSettingsSwitch(card, "Sound effects", PREF_SFX);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(true).create();
         TextView done = dialogButton("Save & close");
         LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
-        doneParams.topMargin = dp(22);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        doneParams.topMargin = dp(12);
         card.addView(done, doneParams);
-        done.setOnClickListener(v -> dialog.dismiss());
+        done.setOnClickListener(v -> {
+            audioManager.playButtonClick();
+            dialog.dismiss();
+        });
         displayDialog(dialog);
     }
 
     private void addSettingsSwitch(LinearLayout card, String title,
-                                   String subtitle, String preferenceKey) {
+                                   String preferenceKey) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rowParams = fullWidth();
-        rowParams.topMargin = dp(24);
+        rowParams.topMargin = dp(10);
         card.addView(row, rowParams);
 
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
         row.addView(labels, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        labels.addView(label(title, 16, "#0F172A", true), fullWidth());
-        TextView hint = label(subtitle, 12, "#64748B", false);
-        LinearLayout.LayoutParams hintParams = fullWidth();
-        hintParams.topMargin = dp(3);
-        labels.addView(hint, hintParams);
-
+        labels.addView(label(title, 16, "#30264D", true), fullWidth());
         SwitchCompat toggle = new SwitchCompat(this);
         toggle.setContentDescription(title);
+        toggle.setThumbTintList(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.parseColor("#7858C8"), Color.parseColor("#C9C4D5")}));
+        toggle.setTrackTintList(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.parseColor("#DACDF5"), Color.parseColor("#E4E1EA")}));
         toggle.setChecked(preferences.getBoolean(preferenceKey, true));
         toggle.setOnCheckedChangeListener((button, checked) -> {
             preferences.edit().putBoolean(preferenceKey, checked).apply();
             audioManager.refreshPreferences();
+            audioManager.playButtonClick();
         });
         LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -214,13 +227,29 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void styleButton(View button, boolean primary) {
-        int fill = Color.parseColor(primary ? "#2563EB" : "#FFFFFF");
-        int stroke = primary ? 0 : Color.parseColor("#E2E8F0");
+        // Richer violet on Play; almost-white ice blue on secondary buttons.
+        GradientDrawable fill = primary
+                ? gradientBackground(new int[]{
+                        Color.parseColor("#A18AEC"), Color.parseColor("#7858C8")}, 16, 0)
+                : gradientBackground(new int[]{
+                        Color.parseColor("#FFFFFF"), Color.parseColor("#EAF6FF")},
+                        16, Color.parseColor("#D9E6F4"));
         button.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(Color.parseColor("#222563EB")),
-                roundedBackground(fill, stroke, 16), null));
+                ColorStateList.valueOf(Color.parseColor("#237858C8")),
+                fill, null));
         button.setClickable(true);
         button.setFocusable(true);
+        // The Play icon is white on purple; the secondary icons are purple on white.
+        if (button instanceof ViewGroup) {
+            ViewGroup row = (ViewGroup) button;
+            for (int index = 0; index < row.getChildCount(); index++) {
+                View child = row.getChildAt(index);
+                if (child instanceof ImageView) {
+                    ((ImageView) child).setColorFilter(
+                            primary ? Color.WHITE : Color.parseColor("#7858C8"));
+                }
+            }
+        }
     }
 
     private LinearLayout dialogCard() {
@@ -238,7 +267,9 @@ public class HomeActivity extends AppCompatActivity {
         button.setFocusable(true);
         button.setBackground(new RippleDrawable(
                 ColorStateList.valueOf(Color.parseColor("#22FFFFFF")),
-                roundedBackground(Color.parseColor("#2563EB"), 0, 14), null));
+                gradientBackground(new int[]{
+                        Color.parseColor("#A18AEC"), Color.parseColor("#7858C8")
+                }, 14, 0), null));
         return button;
     }
 
@@ -256,6 +287,17 @@ public class HomeActivity extends AppCompatActivity {
         drawable.setColor(fill);
         drawable.setCornerRadius(dp(cornerDp));
         if (stroke != 0) drawable.setStroke(dp(1), stroke);
+        return drawable;
+    }
+
+
+    // Reusable gradient for Home buttons and the menu logo.
+    private GradientDrawable gradientBackground(int[] colors, int cornerDp, int strokeColor) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR, colors);
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setCornerRadius(dp(cornerDp));
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
         return drawable;
     }
 

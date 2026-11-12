@@ -8,13 +8,13 @@ import android.media.SoundPool;
 import android.util.Log;
 
 /**
- * Manages original, bundled music and short gameplay sounds.
- *
- * Each Activity creates its own instance and calls onResume/onPause/release.
- * SharedPreferences keys match the existing Home and Game settings switches.
- * No storage or network permissions are needed for res/raw audio.
+ * Two separate looping soundtracks: one for menus/results and one for gameplay.
+ * Sound effects (including all button clicks) follow the existing SFX switch.
+ * Audio is bundled locally in res/raw, with no internet or storage permission.
  */
 public final class GameAudioManager {
+
+    public enum MusicMode { MENU, GAME }
 
     private static final String TAG = "GameAudioManager";
     private static final String PREFS_NAME = "tap_target_settings";
@@ -22,43 +22,59 @@ public final class GameAudioManager {
     private static final String PREF_SFX = "sfx_enabled";
 
     private final SharedPreferences preferences;
-    private MediaPlayer backgroundMusic;
+    private MediaPlayer menuMusic;
+    private MediaPlayer gameMusic;
     private SoundPool soundPool;
     private int correctSoundId;
     private int wrongSoundId;
     private int levelSoundId;
-    private boolean foreground;
-    private boolean musicActive;
+    private int countdownBeepId;
+    private int countdownGoId;
+    private int congratulationsId;
+    private int buttonClickId;
+
+    private MusicMode musicMode = MusicMode.MENU;
+    private boolean foreground = false;
+    private boolean musicActive = false;
 
     public GameAudioManager(Context context) {
         Context appContext = context.getApplicationContext();
         preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
         try {
-            backgroundMusic = MediaPlayer.create(appContext, R.raw.bg_loop);
-            if (backgroundMusic != null) {
-                backgroundMusic.setLooping(true);
-                backgroundMusic.setVolume(0.24f, 0.24f);
+            menuMusic = MediaPlayer.create(appContext, R.raw.bg_loop);
+            if (menuMusic != null) {
+                menuMusic.setLooping(true);
+                menuMusic.setVolume(0.20f, 0.20f);
             }
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Could not initialize background music", error);
-            backgroundMusic = null;
+            gameMusic = MediaPlayer.create(appContext, R.raw.game_loop);
+            if (gameMusic != null) {
+                gameMusic.setLooping(true);
+                // Keep the competitive track below the tap sound effects.
+                gameMusic.setVolume(0.18f, 0.18f);
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not initialize music", e);
         }
 
         try {
-            AudioAttributes soundAttributes = new AudioAttributes.Builder()
+            AudioAttributes attributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_GAME)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build();
             soundPool = new SoundPool.Builder()
-                    .setAudioAttributes(soundAttributes)
-                    .setMaxStreams(4)
+                    .setAudioAttributes(attributes)
+                    .setMaxStreams(8)
                     .build();
             correctSoundId = soundPool.load(appContext, R.raw.tap_correct, 1);
             wrongSoundId = soundPool.load(appContext, R.raw.tap_wrong, 1);
             levelSoundId = soundPool.load(appContext, R.raw.level_complete, 1);
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Could not initialize sound effects", error);
+            countdownBeepId = soundPool.load(appContext, R.raw.countdown_beep, 1);
+            countdownGoId = soundPool.load(appContext, R.raw.countdown_go, 1);
+            congratulationsId = soundPool.load(appContext, R.raw.congratulations, 1);
+            buttonClickId = soundPool.load(appContext, R.raw.button_click, 1);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not initialize sound effects", e);
             if (soundPool != null) soundPool.release();
             soundPool = null;
         }
@@ -74,56 +90,68 @@ public final class GameAudioManager {
         updateMusic();
     }
 
-    /** True for the menu and active gameplay; false for pause and results. */
+    /** Set the desired soundtrack; never allows both tracks to play together. */
+    public void setMusicMode(MusicMode mode) {
+        musicMode = mode;
+        updateMusic();
+    }
+
+    /** Pauses music during the 3-2-1 intro, pauses, and between levels. */
     public void setMusicActive(boolean active) {
         musicActive = active;
         updateMusic();
     }
 
-    /** Apply the Music switch immediately without recreating the activity. */
+    /** Respond immediately when the user changes Music in either Settings screen. */
     public void refreshPreferences() {
         updateMusic();
     }
 
     private void updateMusic() {
-        if (backgroundMusic == null) return;
-        boolean play = foreground && musicActive &&
+        boolean enabled = foreground && musicActive &&
                 preferences.getBoolean(PREF_MUSIC, true);
+        changePlayback(menuMusic, enabled && musicMode == MusicMode.MENU);
+        changePlayback(gameMusic, enabled && musicMode == MusicMode.GAME);
+    }
+
+    private void changePlayback(MediaPlayer player, boolean shouldPlay) {
+        if (player == null) return;
         try {
-            if (play && !backgroundMusic.isPlaying()) {
-                backgroundMusic.start();
-            } else if (!play && backgroundMusic.isPlaying()) {
-                backgroundMusic.pause();
+            if (shouldPlay && !player.isPlaying()) {
+                player.start();
+            } else if (!shouldPlay && player.isPlaying()) {
+                player.pause();
             }
-        } catch (IllegalStateException error) {
-            Log.w(TAG, "Music could not change playback state", error);
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Could not change music playback", e);
         }
     }
 
-    public void playCorrectTap() {
-        playSound(correctSoundId, 0.72f);
-    }
+    // Independent sound effects: available even when background music is muted.
+    public void playCorrectTap()      { playSound(correctSoundId, 0.46f); }
+    public void playWrongTap()        { playSound(wrongSoundId, 0.24f); }
+    public void playLevelComplete()   { playSound(levelSoundId, 0.56f); }
+    public void playCountdownBeep()   { playSound(countdownBeepId, 0.68f); }
+    public void playCountdownGo()     { playSound(countdownGoId, 0.72f); }
+    public void playCongratulations() { playSound(congratulationsId, 0.75f); }
+    public void playButtonClick()     { playSound(buttonClickId, 0.30f); }
 
-    public void playWrongTap() {
-        playSound(wrongSoundId, 0.35f);
-    }
-
-    public void playLevelComplete() {
-        playSound(levelSoundId, 0.55f);
-    }
-
-    private void playSound(int soundId, float volume) {
-        if (!foreground || soundPool == null || soundId == 0 ||
+    private void playSound(int id, float volume) {
+        if (!foreground || soundPool == null || id == 0 ||
                 !preferences.getBoolean(PREF_SFX, true)) return;
-        soundPool.play(soundId, volume, volume, 1, 0, 1f);
+        soundPool.play(id, volume, volume, 1, 0, 1f);
     }
 
     public void release() {
         foreground = false;
         musicActive = false;
-        if (backgroundMusic != null) {
-            backgroundMusic.release();
-            backgroundMusic = null;
+        if (menuMusic != null) {
+            menuMusic.release();
+            menuMusic = null;
+        }
+        if (gameMusic != null) {
+            gameMusic.release();
+            gameMusic = null;
         }
         if (soundPool != null) {
             soundPool.release();

@@ -2,150 +2,128 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8FAFC"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="@drawable/bg_home_gradient">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="560dp"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingLeft="26dp"
-        android:paddingTop="30dp"
-        android:paddingRight="26dp"
-        android:paddingBottom="30dp">
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="24dp"
+        android:paddingBottom="24dp">
 
-        <!-- Centered brand block; background applied in HomeActivity.java. -->
         <ImageView
             android:id="@+id/homeLogo"
-            android:layout_width="104dp"
-            android:layout_height="104dp"
-            android:layout_gravity="center_horizontal"
-            android:padding="22dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:padding="18dp"
             android:src="@drawable/ic_target"
-            android:contentDescription="Tap the Target game icon" />
+            android:contentDescription="Tap the Target logo" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
             android:gravity="center"
+            android:layout_marginTop="20dp"
             android:text="TAP THE TARGET"
-            android:textColor="#0F172A"
-            android:textSize="29sp"
-            android:textStyle="bold" />
+            android:textSize="27sp"
+            android:textStyle="bold"
+            android:textColor="#30264D" />
 
+        <!-- No tagline: intentionally removed for a cleaner Home screen. -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Spot the different shade!"
-            android:textColor="#64748B"
-            android:textSize="15sp" />
+            android:layout_marginTop="10dp"
+            android:text="8 LEVELS · 5 SECONDS EACH"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#7858C8" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:gravity="center"
-            android:text="8 LEVELS  ·  5 SECONDS EACH"
-            android:textColor="#94A3B8"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <!-- Menu cards. Rounded backgrounds / ripple are set by Java. -->
         <LinearLayout
             android:id="@+id/playButton"
             android:layout_width="match_parent"
-            android:layout_height="62dp"
-            android:layout_marginTop="48dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="52dp"
+            android:orientation="horizontal"
+            android:gravity="center"
             android:clickable="true"
             android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal"
             android:contentDescription="Play game">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="23dp"
+                android:layout_height="23dp"
                 android:src="@drawable/ic_play"
                 android:contentDescription="@null" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
                 android:layout_marginStart="12dp"
                 android:text="PLAY GAME"
-                android:textColor="#FFFFFF"
+                android:textStyle="bold"
                 android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textColor="#FFFFFF" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/leaderboardButton"
             android:layout_width="match_parent"
-            android:layout_height="62dp"
-            android:layout_marginTop="14dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="13dp"
+            android:orientation="horizontal"
+            android:gravity="center"
             android:clickable="true"
             android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal"
-            android:contentDescription="Open Top 25 leaderboard">
+            android:contentDescription="Open leaderboard">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="23dp"
+                android:layout_height="23dp"
                 android:src="@drawable/ic_trophy"
                 android:contentDescription="@null" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
                 android:layout_marginStart="12dp"
                 android:text="LEADERBOARD"
-                android:textColor="#0F172A"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:textColor="#30264D" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/homeSettingsButton"
             android:layout_width="match_parent"
-            android:layout_height="62dp"
-            android:layout_marginTop="14dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="13dp"
+            android:orientation="horizontal"
+            android:gravity="center"
             android:clickable="true"
             android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal"
             android:contentDescription="Open game settings">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="23dp"
+                android:layout_height="23dp"
                 android:src="@drawable/ic_settings"
                 android:contentDescription="@null" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
                 android:layout_marginStart="12dp"
                 android:text="SETTINGS"
-                android:textColor="#0F172A"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:textColor="#30264D" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="42dp"
-            android:gravity="center"
-            android:text="Find the odd tile. Tap fast. Climb the ranks."
-            android:textColor="#94A3B8"
-            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
