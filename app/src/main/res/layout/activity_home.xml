@@ -34,17 +34,6 @@
             android:textStyle="bold"
             android:textColor="#30264D" />
 
-        <!-- No tagline: intentionally removed for a cleaner Home screen. -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:layout_marginTop="10dp"
-            android:text="8 LEVELS · 5 SECONDS EACH"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#7858C8" />
-
         <LinearLayout
             android:id="@+id/playButton"
             android:layout_width="match_parent"

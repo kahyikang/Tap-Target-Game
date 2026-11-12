@@ -47,13 +47,28 @@
                 android:background="@android:color/transparent" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/modeText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="Easy Mode"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#30264D" />
+
         <!-- Centered level pill -->
         <TextView
             android:id="@+id/levelText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:paddingStart="19dp"
             android:paddingEnd="19dp"
             android:paddingTop="7dp"

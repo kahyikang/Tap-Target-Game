@@ -169,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
         INTRO, PLAYING, PAUSED, LEVEL_COMPLETE, GAME_OVER
     }
 
+    private TextView modeText;
     private TextView levelText;
     private TextView scoreLabel;
     private TextView scoreText;
@@ -219,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        modeText = findViewById(R.id.modeText);
         levelText = findViewById(R.id.levelText);
         scoreLabel = findViewById(R.id.scoreLabel);
         scoreText = findViewById(R.id.scoreText);
@@ -242,7 +244,10 @@ public class MainActivity extends AppCompatActivity {
         finally { legacyScores.close(); }
         audioManager = new GameAudioManager(this);
 
-        // Centered level + score badges; no dividers or surrounding board panel.
+        // Centered mode + level + score badges; no dividers or surrounding board panel.
+        modeText.setBackground(gradientBackground(new int[]{
+                Color.parseColor("#EEE7FF"), Color.parseColor("#E6F7FF")
+        }, 50, 0));
         levelText.setBackground(gradientBackground(new int[]{
                 Color.parseColor("#E6F7FF"), Color.parseColor("#EEE7FF")
         }, 50, 0));
@@ -344,7 +349,26 @@ public class MainActivity extends AppCompatActivity {
         introTitle.setText(step == 0 ? "ARE YOU READY!" :
                 (step == 4 ? "LET'S GO!" : "GET READY"));
         introNumber.setText(messages[step]);
-        introNumber.setTextColor(Color.parseColor(step == 4 ? "#59A3C7" : "#7858C8"));
+
+        int introColor;
+        switch (step) {
+            case 1:
+                introColor = Color.parseColor("#E45757"); // 3 = red
+                break;
+            case 2:
+                introColor = Color.parseColor("#F2C94C"); // 2 = yellow
+                break;
+            case 3:
+                introColor = Color.parseColor("#4CAF78"); // 1 = green
+                break;
+            case 4:
+                introColor = Color.parseColor("#59A3C7"); // START = ice blue
+                break;
+            default:
+                introColor = Color.parseColor("#7858C8"); // READY = purple
+                break;
+        }
+        introNumber.setTextColor(introColor);
         introHint.setText(step == 0
                 ? "Find the tile with a different shade."
                 : step == 4 ? "Tap as fast as you can!" : "Focus on the colors");
@@ -543,8 +567,8 @@ public class MainActivity extends AppCompatActivity {
                 new String[]{"LEVEL", "SCORE", "TIME LEFT"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore), formatSeconds(timeRemainingMs)},
-                "Resume game", this::resumeLevel,
-                "End game", () -> confirmEndGame(this::showPauseDialog), true
+                "Resume Game", this::resumeLevel,
+                "End Game", () -> confirmEndGame(this::showPauseDialog), true
         );
     }
 
@@ -583,7 +607,7 @@ public class MainActivity extends AppCompatActivity {
                 new String[]{"LEVEL", "TOTAL SCORE", lastLevel ? "STATUS" : "NEXT GRID"},
                 new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore), lastLevel ? "Done" : nextSize + " x " + nextSize},
-                lastLevel ? "Finish game" : "Next level",
+                lastLevel ? "Finish Game" : "Next Level",
                 () -> {
                     if (lastLevel) {
                         // Level 8 was completed naturally: no exit confirmation needed.
@@ -592,7 +616,7 @@ public class MainActivity extends AppCompatActivity {
                         startLevel(levelIndex + 1);
                     }
                 },
-                lastLevel ? null : "End game",
+                lastLevel ? null : "End Game",
                 lastLevel ? null : () -> confirmEndGame(this::showLevelCompleteDialog),
                 true
         );
@@ -605,8 +629,8 @@ public class MainActivity extends AppCompatActivity {
                 Color.parseColor("#CB5879"), Color.parseColor("#FFE8F0"),
                 new String[]{"CURRENT LEVEL", "TOTAL SCORE"},
                 new String[]{String.valueOf(levelIndex + 1), String.valueOf(totalScore)},
-                "Keep playing", returnToPreviousDialog,
-                "Yes, end game", this::endGame, true
+                "Keep Playing", returnToPreviousDialog,
+                "Yes, End Game", this::endGame, true
         );
     }
 
@@ -627,15 +651,15 @@ public class MainActivity extends AppCompatActivity {
         settingsButton.setEnabled(false);
 
         showStyledDialog(
-                "★", null, "Game over",
+                "★", gameMode.label() + " Mode", "Game Over",
                 null,
                 Color.parseColor("#E6AC29"), Color.parseColor("#FFF3CD"),
                 new String[]{"LEVEL REACHED", "FINAL SCORE"},
-                new String[]{gameMode.label() + " " + (levelIndex + 1) + "/" + levels.size(),
+                new String[]{(levelIndex + 1) + "/" + levels.size(),
                         String.valueOf(totalScore)},
-                "View results", this::showPostGameResults,
-                "Play again", this::startNewGame, false,
-                "Main menu", this::returnToHome
+                "View Results", this::showPostGameResults,
+                "Play Again", this::startNewGame, false,
+                "Main Menu", this::returnToHome
         );
     }
 
@@ -678,7 +702,7 @@ public class MainActivity extends AppCompatActivity {
 
         EditText nameInput = new EditText(this);
         nameInput.setSingleLine(true);
-        nameInput.setHint("Your name");
+        nameInput.setHint("Your Name");
         nameInput.setTextSize(16);
         nameInput.setTextColor(Color.parseColor("#30264D"));
         nameInput.setHintTextColor(Color.parseColor("#9F96B8"));
@@ -696,7 +720,7 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(false).create();
 
-        TextView save = makeDialogButton("Save score", true, false);
+        TextView save = makeDialogButton("Save Score", true, false);
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
         saveParams.topMargin = dp(20);
@@ -721,7 +745,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        TextView skip = makeDialogButton("Skip saving", false, false);
+        TextView skip = makeDialogButton("Skip Saving", false, false);
         LinearLayout.LayoutParams skipParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
         skipParams.topMargin = dp(9);
@@ -818,7 +842,7 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(false).create();
 
-        TextView playAgain = makeDialogButton("Play again", true, false);
+        TextView playAgain = makeDialogButton("Play Again", true, false);
         LinearLayout.LayoutParams playAgainParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
         playAgainParams.topMargin = dp(18);
@@ -829,7 +853,7 @@ public class MainActivity extends AppCompatActivity {
             startNewGame();
         });
 
-        TextView close = makeDialogButton("Main menu", false, false);
+        TextView close = makeDialogButton("Main Menu", false, false);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
         closeParams.topMargin = dp(8);
@@ -882,12 +906,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showLeaderboardErrorDialog() {
-        showStyledDialog("!", "SCORE ERROR", "Couldn't load scores",
+        showStyledDialog("!", "SCORE ERROR", "Couldn't Load Scores",
                 "Your game score hasn't been saved. You can retry opening the leaderboard.",
                 Color.parseColor("#CB5879"), Color.parseColor("#FFE8F0"),
                 new String[]{"CURRENT SCORE"}, new String[]{String.valueOf(totalScore)},
-                "Try again", this::showPostGameResults,
-                "Play again", this::startNewGame, false);
+                "Try Again", this::showPostGameResults,
+                "Play Again", this::startNewGame, false);
     }
 
     // SETTINGS: the switches directly control both music tracks and all SFX.
@@ -916,7 +940,7 @@ public class MainActivity extends AppCompatActivity {
         card.addView(heading, fullWidth());
 
         addSettingsSwitch(card, "Music", PREF_MUSIC);
-        addSettingsSwitch(card, "Sound effects", PREF_SFX);
+        addSettingsSwitch(card, "Sound Effects", PREF_SFX);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card)
@@ -924,7 +948,7 @@ public class MainActivity extends AppCompatActivity {
                 .create();
         dialog.setCanceledOnTouchOutside(false);
 
-        TextView close = makeDialogButton("Save & resume", true, false);
+        TextView close = makeDialogButton("Save & Resume", true, false);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
         closeParams.topMargin = dp(12);
@@ -1238,8 +1262,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateHeader() {
-        levelText.setText(gameMode.label() + "  •  Level "
-                + (levelIndex + 1) + "/" + levels.size());
+        modeText.setText(gameMode.label() + " Mode");
+        levelText.setText("Level " + (levelIndex + 1) + "/" + levels.size());
         scoreText.setText(String.valueOf(totalScore));
         timerText.setText(formatSeconds(timeRemainingMs));
         updateTimerProgress();

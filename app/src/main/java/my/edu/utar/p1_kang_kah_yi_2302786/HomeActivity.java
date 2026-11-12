@@ -92,14 +92,12 @@ public class HomeActivity extends AppCompatActivity {
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView easy = modeChoice("EASY MODE", "Same color difference in all 8 levels",
-                "#E8F6FF", "#365B82");
+        TextView easy = modeChoice("EASY MODE", "#E8F6FF", "#365B82");
         LinearLayout.LayoutParams easyParams = fullWidth();
         easyParams.topMargin = dp(22);
         card.addView(easy, easyParams);
 
-        TextView hard = modeChoice("HARD MODE", "Harder shades · levels advance automatically",
-                "#F0E8FF", "#7858C8");
+        TextView hard = modeChoice("HARD MODE", "#F0E8FF", "#7858C8");
         LinearLayout.LayoutParams hardParams = fullWidth();
         hardParams.topMargin = dp(12);
         card.addView(hard, hardParams);
@@ -111,12 +109,11 @@ public class HomeActivity extends AppCompatActivity {
         displayDialog(dialog);
     }
 
-    private TextView modeChoice(String title, String detail,
+    private TextView modeChoice(String title,
                                 String background, String foreground) {
-        TextView choice = label(title + "\n" + detail, 14, foreground, true);
+        TextView choice = label(title, 16, foreground, true);
         choice.setGravity(Gravity.CENTER);
-        choice.setLineSpacing(dp(6), 1f);
-        choice.setPadding(dp(14), dp(16), dp(14), dp(16));
+        choice.setPadding(dp(14), dp(18), dp(14), dp(18));
         choice.setClickable(true);
         choice.setFocusable(true);
         choice.setBackground(new RippleDrawable(
@@ -169,7 +166,7 @@ public class HomeActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         if (scores.isEmpty()) {
-            TextView empty = label("No scores yet. Play your first game!",
+            TextView empty = label("No Scores Yet. Play Your First Game!",
                     14, "#716A8E", false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(8), dp(48), dp(8), dp(48));
@@ -209,7 +206,7 @@ public class HomeActivity extends AppCompatActivity {
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(true).create();
-        TextView close = dialogButton("Back to menu");
+        TextView close = dialogButton("Back to Menu");
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
         closeParams.topMargin = dp(18);
@@ -257,11 +254,11 @@ public class HomeActivity extends AppCompatActivity {
         card.addView(title, fullWidth());
 
         addSettingsSwitch(card, "Music", PREF_MUSIC);
-        addSettingsSwitch(card, "Sound effects", PREF_SFX);
+        addSettingsSwitch(card, "Sound Effects", PREF_SFX);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(card).setCancelable(true).create();
-        TextView done = dialogButton("Save & close");
+        TextView done = dialogButton("Save & Close");
         LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
         doneParams.topMargin = dp(12);
