@@ -611,7 +611,7 @@ public class MainActivity extends AppCompatActivity {
         int nextSize = lastLevel ? 0 : levels.get(levelIndex + 1).gridSize;
 
         showStyledDialog(
-                "✓", null, "Level " + (levelIndex + 1) + " cleared!",
+                "✓", null, "Level " + (levelIndex + 1) + " Cleared!",
                 null,
                 Color.parseColor("#527DB8"), Color.parseColor("#E0F4FD"),
                 new String[]{"LEVEL", "TOTAL SCORE", lastLevel ? "STATUS" : "NEXT GRID"},
@@ -701,7 +701,7 @@ public class MainActivity extends AppCompatActivity {
         title.setGravity(Gravity.CENTER);
         card.addView(title, fullWidth());
 
-        TextView scoreBadge = makeText(gameMode.label() + " Mode  •  Score: " + totalScore, 18,
+        TextView scoreBadge = makeText(gameMode.label() + " Mode", 18,
                 Color.parseColor("#7858C8"), true);
         scoreBadge.setGravity(Gravity.CENTER);
         scoreBadge.setPadding(dp(14), dp(9), dp(14), dp(9));

@@ -45,13 +45,13 @@ public final class GameAudioManager {
             menuMusic = MediaPlayer.create(appContext, R.raw.bg_loop);
             if (menuMusic != null) {
                 menuMusic.setLooping(true);
-                menuMusic.setVolume(0.20f, 0.20f);
+                menuMusic.setVolume(0.5f, 0.50f);
             }
             gameMusic = MediaPlayer.create(appContext, R.raw.game_loop);
             if (gameMusic != null) {
                 gameMusic.setLooping(true);
                 // Keep the competitive track below the tap sound effects.
-                gameMusic.setVolume(0.18f, 0.18f);
+                gameMusic.setVolume(0.5f, 0.5f);
             }
         } catch (RuntimeException e) {
             Log.w(TAG, "Could not initialize music", e);
@@ -128,13 +128,13 @@ public final class GameAudioManager {
     }
 
     // Independent sound effects: available even when background music is muted.
-    public void playCorrectTap()      { playSound(correctSoundId, 0.46f); }
-    public void playWrongTap()        { playSound(wrongSoundId, 0.24f); }
-    public void playLevelComplete()   { playSound(levelSoundId, 0.56f); }
-    public void playCountdownBeep()   { playSound(countdownBeepId, 0.68f); }
-    public void playCountdownGo()     { playSound(countdownGoId, 0.72f); }
-    public void playCongratulations() { playSound(congratulationsId, 0.75f); }
-    public void playButtonClick()     { playSound(buttonClickId, 0.30f); }
+    public void playCorrectTap()      { playSound(correctSoundId, 0.5f); }
+    public void playWrongTap()        { playSound(wrongSoundId, 0.5f); }
+    public void playLevelComplete()   { playSound(levelSoundId, 0.5f); }
+    public void playCountdownBeep()   { playSound(countdownBeepId, 0.5f); }
+    public void playCountdownGo()     { playSound(countdownGoId, 0.5f); }
+    public void playCongratulations() { playSound(congratulationsId, 0.50f); }
+    public void playButtonClick()     { playSound(buttonClickId, 0.50f); }
 
     private void playSound(int id, float volume) {
         if (!foreground || soundPool == null || id == 0 ||
