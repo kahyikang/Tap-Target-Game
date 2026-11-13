@@ -54,28 +54,28 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
      */
     public void seedInitialSampleScores() {
         final String[] easyNames = {
-                "Demo Alex", "Demo Bella", "Demo Casey", "Demo Dylan", "Demo Eden",
-                "Demo Finn", "Demo Grace", "Demo Hugo", "Demo Iris", "Demo Jamie",
-                "Demo Kelly", "Demo Luca", "Demo Maya", "Demo Noah", "Demo Olive",
-                "Demo Parker", "Demo Quinn", "Demo Riley", "Demo Sage", "Demo Taylor",
-                "Demo Uma", "Demo Victor", "Demo Wren", "Demo Xander", "Demo Zoe"
+                "Alex", "Bella", "Casey", "Dylan", "Eden",
+                "Finn", "Grace", "Hugo", "Iris", "Jamie",
+                "Kelly", "Luca", "Maya", "Noah", "Olive",
+                "Parker", "Quinn", "Riley", "Sage", "Taylor",
+                "Uma", "Victor", "Wren", "Xander", "Zoe"
         };
         final int[] easyScores = {
                 40, 38, 36, 34, 32, 30, 28, 26, 24, 22,
-                20, 18, 16, 14, 12, 11, 10, 9, 8, 7,
-                6, 5, 4, 3, 2
+                20, 19, 18, 18, 17, 16, 16, 16, 12, 10,
+                9, 9, 8, 8, 8
         };
         final String[] hardNames = {
-                "Demo Nova", "Demo Jett", "Demo Luna", "Demo Ash", "Demo Milo",
-                "Demo Cora", "Demo Reese", "Demo Dex", "Demo Robin", "Demo Lila",
-                "Demo Jasper", "Demo Mia", "Demo Arlo", "Demo Cleo", "Demo Beau",
-                "Demo Kira", "Demo Rory", "Demo Blair", "Demo June", "Demo Piper",
-                "Demo Remy", "Demo Ellis", "Demo Zane", "Demo Indie", "Demo Pax"
+                "Nova", "Jett", "Luna", "Ash", "Milo",
+                "Cora", "Reese", "Dex", "Robin", "Lila",
+                "Jasper", "Mia", "Arlo", "Cleo", "Beau",
+                "Kira", "Rory", "Blair", "June", "Piper",
+                "Remy", "Ellis", "Zane", "Indie", "Pax"
         };
         final int[] hardScores = {
                 24, 23, 22, 21, 20, 19, 18, 17, 16, 15,
-                14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
-                4, 3, 2, 1, 0
+                14, 13, 12, 11, 11, 10, 10, 10, 9, 9,
+                9, 8, 7, 6, 5
         };
 
         SQLiteDatabase db = getWritableDatabase();

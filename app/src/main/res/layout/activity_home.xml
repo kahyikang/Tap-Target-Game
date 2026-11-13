@@ -18,38 +18,37 @@
 
         <ImageView
             android:id="@+id/homeLogo"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:padding="18dp"
-            android:src="@drawable/ic_target"
-            android:contentDescription="Tap the Target logo" />
+            android:layout_width="116dp"
+            android:layout_height="116dp"
+            android:src="@drawable/tappop_four_tiles"
+            android:scaleType="fitCenter"
+            android:contentDescription="TapPop four-tile logo" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:layout_marginTop="20dp"
-            android:text="TAP THE TARGET"
-            android:textSize="27sp"
+            android:layout_marginTop="12dp"
+            android:text="@string/tappop_name"
+            android:textSize="33sp"
             android:textStyle="bold"
             android:textColor="#30264D" />
 
-        <!-- No tagline: intentionally removed for a cleaner Home screen. -->
+        <!-- Short TapPop tagline replaces the level-count subtitle. -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:layout_marginTop="10dp"
-            android:text="8 LEVELS · 5 SECONDS EACH"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:text="@string/tappop_tagline"
+            android:textSize="14sp"
             android:textColor="#7858C8" />
 
         <LinearLayout
             android:id="@+id/playButton"
             android:layout_width="match_parent"
             android:layout_height="58dp"
-            android:layout_marginTop="52dp"
+            android:layout_marginTop="38dp"
             android:orientation="horizontal"
             android:gravity="center"
             android:clickable="true"

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tappop_name">TapPop</string>
+    <string name="tappop_tagline">Spot The Shade. Tap To Score.</string>
+    <color name="tappop_icon_background">#F1E9FF</color>
+</resources>

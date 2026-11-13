@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.database.sqlite.SQLiteException;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -16,6 +17,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -60,11 +62,10 @@ public class HomeActivity extends AppCompatActivity {
         audioManager.setMusicActive(true);
 
         ImageView logo = findViewById(R.id.homeLogo);
-        // A soft ice-blue/lilac accent behind the logo.
-        logo.setBackground(gradientBackground(new int[]{
-                Color.parseColor("#DDF3FF"), Color.parseColor("#E9DFFF")
-        }, 24, 0));
-        logo.setColorFilter(Color.parseColor("#7858C8"));
+        // Use the transparent four-tile artwork directly.
+        logo.setBackground(null);
+        logo.clearColorFilter();
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         View play = findViewById(R.id.playButton);
         View howToPlay = findViewById(R.id.howToPlayButton);
         View leaderboard = findViewById(R.id.leaderboardButton);
@@ -217,7 +218,7 @@ public class HomeActivity extends AppCompatActivity {
             title.setGravity(Gravity.CENTER);
             content.addView(title, fullWidth());
 
-            TextView shortText = label("Tap the TILE with the different SHADE", 13, "#6A6280", false);
+            TextView shortText = label("Tap the tile with the different shade", 13, "#6A6280", false);
             shortText.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams shortParams = fullWidth();
             shortParams.topMargin = dp(6);
@@ -227,34 +228,89 @@ public class HomeActivity extends AppCompatActivity {
             gridCard.setOrientation(LinearLayout.VERTICAL);
             gridCard.setGravity(Gravity.CENTER);
             gridCard.setPadding(dp(12), dp(12), dp(12), dp(12));
-            gridCard.setBackground(roundedBackground(Color.parseColor("#F6FAFF"),
-                    Color.parseColor("#D9E6F4"), 16));
+            gridCard.setBackground(roundedBackground(Color.parseColor("#F6FAFF"), 0, 16));
             LinearLayout.LayoutParams gridParams = fullWidth();
             gridParams.topMargin = dp(14);
             content.addView(gridCard, gridParams);
 
+            FrameLayout demoArea = new FrameLayout(this);
+            LinearLayout.LayoutParams demoAreaParams = fullWidth();
+            demoAreaParams.height = dp(132);
+            gridCard.addView(demoArea, demoAreaParams);
+
+            LinearLayout demoGrid = new LinearLayout(this);
+            demoGrid.setOrientation(LinearLayout.VERTICAL);
+            demoGrid.setGravity(Gravity.CENTER);
+            FrameLayout.LayoutParams demoGridParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            demoGridParams.gravity = Gravity.CENTER;
+            demoArea.addView(demoGrid, demoGridParams);
+
+            View targetTile = null;
             for (int r = 0; r < 2; r++) {
                 LinearLayout row = new LinearLayout(this);
                 row.setGravity(Gravity.CENTER);
                 LinearLayout.LayoutParams rowParams = fullWidth();
                 rowParams.topMargin = r == 0 ? 0 : dp(6);
-                gridCard.addView(row, rowParams);
+                demoGrid.addView(row, rowParams);
                 for (int c = 0; c < 2; c++) {
-                    View tile = new View(this);
                     boolean target = (r == 0 && c == 1);
+                    TextView tile = label(target ? "TAP" : "", 15,
+                            "#FFFFFF", true);
+                    tile.setGravity(Gravity.CENTER);
+                    tile.setContentDescription(target ? "Tap the different tile" : "Normal tile");
                     tile.setBackground(roundedBackground(
                             Color.parseColor(target ? "#A77AE6" : "#D8C4F5"), 0, 10));
                     LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(dp(54), dp(54));
                     tileParams.setMargins(dp(4), 0, dp(4), 0);
                     row.addView(tile, tileParams);
+                    if (target) targetTile = tile;
                 }
             }
 
-            TextView hint = label("One tile is different", 12, "#7858C8", true);
-            hint.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams hintParams = fullWidth();
-            hintParams.topMargin = dp(10);
-            gridCard.addView(hint, hintParams);
+            TextView plusOne = label("+1", 13, "#FFFFFF", true);
+            plusOne.setGravity(Gravity.CENTER);
+            plusOne.setPadding(dp(8), dp(4), dp(8), dp(4));
+            plusOne.setBackground(gradientBackground(new int[]{
+                    Color.parseColor("#A88CEB"), Color.parseColor("#7858C8")
+            }, 20, 0));
+            plusOne.setAlpha(0f);
+            FrameLayout.LayoutParams plusParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            plusParams.gravity = Gravity.TOP | Gravity.LEFT;
+            demoArea.addView(plusOne, plusParams);
+
+            View finalTargetTile = targetTile;
+            if (finalTargetTile != null) {
+                // Anchor the graphic to the actual tile position rather than
+                // guessing pixel offsets. This works across screen sizes.
+                demoArea.post(() -> {
+                    if (!demoArea.isAttachedToWindow()) return;
+                    Rect targetBounds = new Rect(0, 0,
+                            finalTargetTile.getWidth(), finalTargetTile.getHeight());
+                    demoArea.offsetDescendantRectToMyCoords(finalTargetTile, targetBounds);
+
+                    FrameLayout.LayoutParams scoreLayout =
+                            (FrameLayout.LayoutParams) plusOne.getLayoutParams();
+                    scoreLayout.leftMargin = targetBounds.left + dp(13);
+                    scoreLayout.topMargin = targetBounds.top + dp(9);
+                    plusOne.setLayoutParams(scoreLayout);
+                });
+
+                finalTargetTile.setClickable(true);
+                finalTargetTile.setOnClickListener(v -> {
+                    audioManager.playCorrectTap();
+                    finalTargetTile.setScaleX(0.92f);
+                    finalTargetTile.setScaleY(0.92f);
+                    finalTargetTile.animate().scaleX(1f).scaleY(1f).setDuration(180).start();
+                    plusOne.animate().cancel();
+                    plusOne.setAlpha(0f);
+                    plusOne.setTranslationY(dp(12));
+                    plusOne.animate().alpha(1f).translationY(0).setDuration(180)
+                            .withEndAction(() -> plusOne.animate().alpha(0f).translationY(dp(-8)).setStartDelay(380).setDuration(180).start())
+                            .start();
+                });
+            }
         } else if (pageIndex == 1) {
             TextView title = label("Score and Time", 18, "#30264D", true);
             title.setGravity(Gravity.CENTER);
@@ -284,7 +340,7 @@ public class HomeActivity extends AppCompatActivity {
             timerParams.topMargin = dp(12);
             content.addView(timerCard, timerParams);
 
-            timerCard.addView(label("5 seconds for each level", 15, "#30264D", true), fullWidth());
+            timerCard.addView(label("5 seconds each level", 15, "#30264D", true), fullWidth());
             View barBg = new View(this);
             barBg.setBackground(roundedBackground(Color.parseColor("#DCE8F4"), 0, 6));
             LinearLayout.LayoutParams barBgParams = new LinearLayout.LayoutParams(
@@ -299,7 +355,7 @@ public class HomeActivity extends AppCompatActivity {
             barFillParams.topMargin = dp(-10);
             timerCard.addView(barFill, barFillParams);
         } else if (pageIndex == 2) {
-            TextView pill = label("EASY MODE", 16, "#365B82", true);
+            TextView pill = label("Easy Mode", 16, "#365B82", true);
             pill.setGravity(Gravity.CENTER);
             pill.setPadding(dp(14), dp(9), dp(14), dp(9));
             pill.setBackground(roundedBackground(Color.parseColor("#E8F6FF"), 0, 16));
@@ -316,9 +372,9 @@ public class HomeActivity extends AppCompatActivity {
             content.addView(featureRow("Ⅱ", "Pause after each level", "#7B6BD6"), rowParams3);
             LinearLayout.LayoutParams rowParams4 = fullWidth();
             rowParams4.topMargin = dp(10);
-            content.addView(featureRow("0", "Wrong tap: NO penalty", "#47A17C"), rowParams4);
+            content.addView(featureRow("0", "Wrong tap: no penalty", "#47A17C"), rowParams4);
         } else {
-            TextView pill = label("HARD MODE", 16, "#7858C8", true);
+            TextView pill = label("Hard Mode", 16, "#7858C8", true);
             pill.setGravity(Gravity.CENTER);
             pill.setPadding(dp(14), dp(9), dp(14), dp(9));
             pill.setBackground(roundedBackground(Color.parseColor("#F0E8FF"), 0, 16));
@@ -332,7 +388,7 @@ public class HomeActivity extends AppCompatActivity {
             content.addView(featureRow("➜", "Levels auto advance", "#5A9BD4"), rowParams2);
             LinearLayout.LayoutParams rowParams3 = fullWidth();
             rowParams3.topMargin = dp(10);
-            content.addView(featureRow("-1", "Wrong tap DEDUCTS 1 point", "#D46060"), rowParams3);
+            content.addView(featureRow("-1", "Wrong tap deducts 1 point", "#D46060"), rowParams3);
             LinearLayout.LayoutParams rowParams4 = fullWidth();
             rowParams4.topMargin = dp(10);
             content.addView(featureRow("🏆", "Separate top 25 scores", "#C98B1B"), rowParams4);
