@@ -45,13 +45,13 @@ public final class GameAudioManager {
             menuMusic = MediaPlayer.create(appContext, R.raw.bg_loop);
             if (menuMusic != null) {
                 menuMusic.setLooping(true);
-                menuMusic.setVolume(0.5f, 0.50f);
+                menuMusic.setVolume(1, 1);
             }
             gameMusic = MediaPlayer.create(appContext, R.raw.game_loop);
             if (gameMusic != null) {
                 gameMusic.setLooping(true);
                 // Keep the competitive track below the tap sound effects.
-                gameMusic.setVolume(0.5f, 0.5f);
+                gameMusic.setVolume(1, 1);
             }
         } catch (RuntimeException e) {
             Log.w(TAG, "Could not initialize music", e);
@@ -128,13 +128,13 @@ public final class GameAudioManager {
     }
 
     // Independent sound effects: available even when background music is muted.
-    public void playCorrectTap()      { playSound(correctSoundId, 0.5f); }
-    public void playWrongTap()        { playSound(wrongSoundId, 0.5f); }
-    public void playLevelComplete()   { playSound(levelSoundId, 0.5f); }
-    public void playCountdownBeep()   { playSound(countdownBeepId, 0.5f); }
-    public void playCountdownGo()     { playSound(countdownGoId, 0.5f); }
-    public void playCongratulations() { playSound(congratulationsId, 0.50f); }
-    public void playButtonClick()     { playSound(buttonClickId, 0.50f); }
+    public void playCorrectTap()      { playSound(correctSoundId, 1); }
+    public void playWrongTap()        { playSound(wrongSoundId, 1); }
+    public void playLevelComplete()   { playSound(levelSoundId, 1); }
+    public void playCountdownBeep()   { playSound(countdownBeepId, 1); }
+    public void playCountdownGo()     { playSound(countdownGoId, 1); }
+    public void playCongratulations() { playSound(congratulationsId, 1); }
+    public void playButtonClick()     { playSound(buttonClickId, 1); }
 
     private void playSound(int id, float volume) {
         if (!foreground || soundPool == null || id == 0 ||
