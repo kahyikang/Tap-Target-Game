@@ -320,7 +320,8 @@ public class MainActivity extends AppCompatActivity {
             highlightRandomTile();
             if (firstLevel) {
                 startIntroCountdown();
-            } else {
+            }
+            else {
                 startCountdown();
             }
         });
@@ -330,13 +331,15 @@ public class MainActivity extends AppCompatActivity {
     // timer does not begin until the "START!" message disappears.
     private void startIntroCountdown() {
         stopIntroCountdown();
-        if (state != GameState.INTRO) return;
+        if (state != GameState.INTRO)
+            return;
         introOverlay.setVisibility(View.VISIBLE);
         showIntroStep(0);
     }
 
     private void showIntroStep(int step) {
-        if (state != GameState.INTRO || isFinishing() || isDestroyed()) return;
+        if (state != GameState.INTRO || isFinishing() || isDestroyed())
+            return;
         if (step >= 5) {
             introOverlay.setVisibility(View.GONE);
             introRunnable = null;
@@ -348,8 +351,10 @@ public class MainActivity extends AppCompatActivity {
 
         // Countdown timing is synchronized with the visible 3, 2, 1 and START.
         // No effect on READY; the three numbers receive beeps, then a GO sound.
-        if (step >= 1 && step <= 3) audioManager.playCountdownBeep();
-        if (step == 4) audioManager.playCountdownGo();
+        if (step >= 1 && step <= 3)
+            audioManager.playCountdownBeep();
+        if (step == 4)
+            audioManager.playCountdownGo();
 
         final String[] messages = {"READY", "3", "2", "1", "START!"};
         introTitle.setText(step == 0 ? "ARE YOU READY!" :
@@ -396,7 +401,8 @@ public class MainActivity extends AppCompatActivity {
             introHandler.removeCallbacks(introRunnable);
             introRunnable = null;
         }
-        if (introNumber != null) introNumber.animate().cancel();
+        if (introNumber != null)
+            introNumber.animate().cancel();
     }
 
     // Builds a square grid sized to fit the available board space.
@@ -442,7 +448,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Accepts taps only during live play and applies the selected mode rules.
     private void handleTileTap(int index) {
-        if (state != GameState.PLAYING || !countdownStarted) return;
+        if (state != GameState.PLAYING || !countdownStarted)
+            return;
         if (SystemClock.elapsedRealtime() >= deadlineMs) {
             completeLevel();
             return;
@@ -495,7 +502,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Chooses one target uniformly; the previous target may be chosen again.
     private void highlightRandomTile() {
-        if (tiles.isEmpty()) return;
+        if (tiles.isEmpty())
+            return;
         highlightedIndex = random.nextInt(tiles.size());
 
         for (int index = 0; index < tiles.size(); index++) {
@@ -532,14 +540,16 @@ public class MainActivity extends AppCompatActivity {
         countdown = new CountDownTimer(timeRemainingMs, 50L) {
             @Override
             public void onTick(long millisUntilFinished) {
-                if (state != GameState.PLAYING) return;
+                if (state != GameState.PLAYING)
+                    return;
                 timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
                 updateHeader();
             }
 
             @Override
             public void onFinish() {
-                if (state == GameState.PLAYING) completeLevel();
+                if (state == GameState.PLAYING)
+                    completeLevel();
             }
         }.start();
     }
@@ -554,7 +564,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Stores the exact remaining time before cancelling timer callbacks.
     private void pauseLevel() {
-        if (state != GameState.PLAYING || !countdownStarted) return;
+        if (state != GameState.PLAYING || !countdownStarted)
+            return;
         timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
         stopCountdown();
         if (timeRemainingMs == 0L) {
@@ -571,7 +582,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Restarts the timer using the saved time and keeps the current grid.
     private void resumeLevel() {
-        if (state != GameState.PAUSED) return;
+        if (state != GameState.PAUSED)
+            return;
         state = GameState.PLAYING;
         audioManager.setMusicActive(true);
         startCountdown(); // Continue with remaining time, not a fresh 5 seconds.
@@ -593,7 +605,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Ends timed play and chooses automatic or player-controlled progression.
     private void completeLevel() {
-        if (state != GameState.PLAYING) return;
+        if (state != GameState.PLAYING)
+            return;
         stopCountdown();
         timeRemainingMs = 0L;
         state = GameState.LEVEL_COMPLETE;
@@ -608,9 +621,12 @@ public class MainActivity extends AppCompatActivity {
         if (gameMode == GameMode.HARD) {
             // No between-level dialog in Hard mode: play straight through all 8.
             // The Pause button still permits a voluntary pause at any time.
-            if (levelIndex == levels.size() - 1) endGame();
-            else startLevel(levelIndex + 1);
-        } else {
+            if (levelIndex == levels.size() - 1)
+                endGame();
+            else
+                startLevel(levelIndex + 1);
+        }
+        else {
             // Easy mode retains its Next Level / End Game choice.
             showLevelCompleteDialog();
         }
@@ -632,7 +648,8 @@ public class MainActivity extends AppCompatActivity {
                     if (lastLevel) {
                         // Level 8 was completed naturally: no exit confirmation needed.
                         endGame();
-                    } else {
+                    }
+                    else {
                         startLevel(levelIndex + 1);
                     }
                 },
@@ -664,8 +681,10 @@ public class MainActivity extends AppCompatActivity {
         qualifiedAtFinish = null;
         try {
             qualifiedAtFinish = scoreDatabase.qualifies(totalScore, gameMode);
-            if (qualifiedAtFinish) audioManager.playCongratulations();
-        } catch (SQLiteException error) {
+            if (qualifiedAtFinish)
+                audioManager.playCongratulations();
+        }
+        catch (SQLiteException error) {
             // Results can still show the existing database error dialog later.
         }
         pauseButton.setEnabled(false);
@@ -690,10 +709,12 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (qualifiedAtFinish != null ? qualifiedAtFinish : scoreDatabase.qualifies(totalScore, gameMode)) {
                 showNameEntryDialog();
-            } else {
+            }
+            else {
                 showLeaderboardDialog();
             }
-        } catch (SQLiteException error) {
+        }
+        catch (SQLiteException error) {
             Toast.makeText(this, "Unable to read scores. Please try again.",
                     Toast.LENGTH_LONG).show();
             showLeaderboardErrorDialog();
@@ -702,7 +723,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Validates the player name and saves only if the score still qualifies.
     private void showNameEntryDialog() {
-        if (isFinishing() || isDestroyed()) return;
+        if (isFinishing() || isDestroyed())
+            return;
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(22), dp(24), dp(22), dp(22));
@@ -762,7 +784,8 @@ public class MainActivity extends AppCompatActivity {
                 }
                 dialog.dismiss();
                 showLeaderboardDialog();
-            } catch (SQLiteException error) {
+            }
+            catch (SQLiteException error) {
                 nameInput.setError("Could not save score. Please try again.");
             }
         });
@@ -780,15 +803,19 @@ public class MainActivity extends AppCompatActivity {
         displayDialog(dialog);
     }
 
-    private void showLeaderboardDialog() { showLeaderboardDialog(gameMode); }
+    private void showLeaderboardDialog() {
+        showLeaderboardDialog(gameMode);
+    }
 
     // Loads and displays the selected mode leaderboard.
     private void showLeaderboardDialog(GameMode selectedMode) {
-        if (isFinishing() || isDestroyed()) return;
+        if (isFinishing() || isDestroyed())
+            return;
         final List<ModeScoreDatabaseHelper.ScoreEntry> entries;
         try {
             entries = scoreDatabase.getTop25(selectedMode);
-        } catch (SQLiteException error) {
+        }
+        catch (SQLiteException error) {
             showLeaderboardErrorDialog();
             return;
         }
@@ -827,7 +854,8 @@ public class MainActivity extends AppCompatActivity {
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(18), dp(30), dp(18), dp(30));
             rows.addView(empty, fullWidth());
-        } else {
+        }
+        else {
             for (int i = 0; i < entries.size(); i++) {
                 ModeScoreDatabaseHelper.ScoreEntry score = entries.get(i);
                 LinearLayout row = new LinearLayout(this);
@@ -910,7 +938,8 @@ public class MainActivity extends AppCompatActivity {
             lp.setMargins(dp(3), 0, dp(3), 0);
             tabs.addView(tab, lp);
             tab.setOnClickListener(v -> {
-                if (selected) return;
+                if (selected)
+                    return;
                 audioManager.playButtonClick();
                 showLeaderboardDialog(tabMode);
             });
@@ -939,7 +968,8 @@ public class MainActivity extends AppCompatActivity {
 
     // SETTINGS: the switches directly control both music tracks and all SFX.
     private void showSettingsDialog() {
-        if (state != GameState.PLAYING || !countdownStarted) return;
+        if (state != GameState.PLAYING || !countdownStarted)
+            return;
 
         timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
         stopCountdown();
@@ -1032,9 +1062,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateTimerProgress() {
-        if (timerTrack == null || timerFill == null) return;
+        if (timerTrack == null || timerFill == null)
+            return;
         int width = timerTrack.getWidth();
-        if (width <= 0) return;
+        if (width <= 0)
+            return;
         long duration = levels.get(levelIndex).durationMs;
         float fraction = duration == 0 ? 0f
                 : Math.max(0f, Math.min(1f, (float) timeRemainingMs / duration));
@@ -1080,7 +1112,8 @@ public class MainActivity extends AppCompatActivity {
             boolean secondaryDanger,
             String tertiaryLabel, Runnable tertiaryAction
     ) {
-        if (isFinishing() || isDestroyed()) return;
+        if (isFinishing() || isDestroyed())
+            return;
 
         // Close any previous popup to avoid stacking dialogs.
         if (activeDialog != null && activeDialog.isShowing()) {
@@ -1207,10 +1240,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void displayDialog(AlertDialog dialog) {
-        if (activeDialog != null && activeDialog.isShowing()) activeDialog.dismiss();
+        if (activeDialog != null && activeDialog.isShowing())
+            activeDialog.dismiss();
         activeDialog = dialog;
         dialog.setOnDismissListener(ignored -> {
-            if (activeDialog == dialog) activeDialog = null;
+            if (activeDialog == dialog)
+                activeDialog = null;
         });
         dialog.show();
         Window window = dialog.getWindow();
@@ -1227,7 +1262,8 @@ public class MainActivity extends AppCompatActivity {
         view.setText(text);
         view.setTextSize(sp);
         view.setTextColor(color);
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        if (bold)
+            view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
     }
 
@@ -1246,11 +1282,13 @@ public class MainActivity extends AppCompatActivity {
         if (primary) {
             background = gradientBackground(new int[]{
                     Color.parseColor("#A18AEC"), Color.parseColor("#7858C8")}, 14, 0);
-        } else if (danger) {
+        }
+        else if (danger) {
             background = gradientBackground(new int[]{
                     Color.parseColor("#FFFFFF"), Color.parseColor("#FFF0F5")},
                     14, Color.parseColor("#F0C5D5"));
-        } else {
+        }
+        else {
             background = gradientBackground(new int[]{
                     Color.parseColor("#FFFFFF"), Color.parseColor("#EDF6FF")},
                     14, Color.parseColor("#D3C9E7"));
@@ -1264,7 +1302,8 @@ public class MainActivity extends AppCompatActivity {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fillColor);
         drawable.setCornerRadius(dp(cornerDp));
-        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        if (strokeColor != 0)
+            drawable.setStroke(dp(1), strokeColor);
         return drawable;
     }
 
@@ -1275,7 +1314,8 @@ public class MainActivity extends AppCompatActivity {
                 GradientDrawable.Orientation.TL_BR, colors);
         drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setCornerRadius(dp(cornerDp));
-        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        if (strokeColor != 0)
+            drawable.setStroke(dp(1), strokeColor);
         return drawable;
     }
 
@@ -1332,11 +1372,13 @@ public class MainActivity extends AppCompatActivity {
         if (pausedByBackground) {
             pausedByBackground = false;
             gameGrid.post(() -> {
-                if (state != GameState.PAUSED) return;
+                if (state != GameState.PAUSED)
+                    return;
                 if (timeRemainingMs == 0L) {
                     state = GameState.PLAYING;
                     completeLevel();
-                } else {
+                }
+                else {
                     updateHeader();
                     showPauseDialog();
                 }
@@ -1348,9 +1390,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         stopIntroCountdown();
         stopCountdown();
-        if (activeDialog != null) activeDialog.dismiss();
-        if (scoreDatabase != null) scoreDatabase.close();
-        if (audioManager != null) audioManager.release();
+        if (activeDialog != null)
+            activeDialog.dismiss();
+        if (scoreDatabase != null)
+            scoreDatabase.close();
+        if (audioManager != null)
+            audioManager.release();
         super.onDestroy();
     }
 }

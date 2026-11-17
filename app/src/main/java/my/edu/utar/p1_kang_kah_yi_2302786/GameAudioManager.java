@@ -46,13 +46,15 @@ public final class GameAudioManager {
                 menuMusic.setLooping(true);
                 menuMusic.setVolume(1, 1);
             }
+
             gameMusic = MediaPlayer.create(appContext, R.raw.game_loop);
             if (gameMusic != null) {
                 gameMusic.setLooping(true);
                 // Both music tracks use full player volume.
                 gameMusic.setVolume(1, 1);
             }
-        } catch (RuntimeException e) {
+        }
+        catch (RuntimeException e) {
             Log.w(TAG, "Could not initialize music", e);
         }
 
@@ -72,9 +74,11 @@ public final class GameAudioManager {
             countdownGoId = soundPool.load(appContext, R.raw.countdown_go, 1);
             congratulationsId = soundPool.load(appContext, R.raw.congratulations, 1);
             buttonClickId = soundPool.load(appContext, R.raw.button_click, 1);
-        } catch (RuntimeException e) {
+        }
+        catch (RuntimeException e) {
             Log.w(TAG, "Could not initialize sound effects", e);
-            if (soundPool != null) soundPool.release();
+            if (soundPool != null)
+                soundPool.release();
             soundPool = null;
         }
     }
@@ -115,14 +119,17 @@ public final class GameAudioManager {
     }
 
     private void changePlayback(MediaPlayer player, boolean shouldPlay) {
-        if (player == null) return;
+        if (player == null)
+            return;
         try {
             if (shouldPlay && !player.isPlaying()) {
                 player.start();
-            } else if (!shouldPlay && player.isPlaying()) {
+            }
+            else if (!shouldPlay && player.isPlaying()) {
                 player.pause();
             }
-        } catch (IllegalStateException e) {
+        }
+        catch (IllegalStateException e) {
             Log.w(TAG, "Could not change music playback", e);
         }
     }
@@ -143,15 +150,18 @@ public final class GameAudioManager {
     public void playCountdownGo() {
         playSound(countdownGoId, 1);
     }
-    public void playCongratulations() { playSound(congratulationsId, 1);
+    public void playCongratulations() {
+        playSound(congratulationsId, 1);
     }
-    public void playButtonClick() { playSound(buttonClickId, 1);
+    public void playButtonClick() {
+        playSound(buttonClickId, 1);
     }
 
     // Checks the sound setting on each request so changes apply immediately.
     private void playSound(int id, float volume) {
         if (!foreground || soundPool == null || id == 0 ||
-                !preferences.getBoolean(PREF_SFX, true)) return;
+                !preferences.getBoolean(PREF_SFX, true))
+            return;
         soundPool.play(id, volume, volume, 1, 0, 1f);
     }
 

@@ -22,8 +22,8 @@
 
             <ImageButton
                 android:id="@+id/pauseButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:src="@drawable/ic_pause"
                 android:contentDescription="Pause game"
                 android:background="@android:color/transparent" />
@@ -40,8 +40,8 @@
 
             <ImageButton
                 android:id="@+id/settingsButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:src="@drawable/ic_settings"
                 android:contentDescription="Game settings"
                 android:background="@android:color/transparent" />

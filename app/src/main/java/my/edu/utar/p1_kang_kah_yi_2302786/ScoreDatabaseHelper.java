@@ -54,12 +54,15 @@ public class ScoreDatabaseHelper extends SQLiteOpenHelper {
     }
 
     private boolean qualifies(SQLiteDatabase db, int score) {
-        if (score < 0) return false;
+        if (score < 0)
+            return false;
         try (Cursor cursor = db.rawQuery(
                 "SELECT COUNT(*), MIN(score) FROM " + TABLE, null)) {
-            if (!cursor.moveToFirst()) return true;
+            if (!cursor.moveToFirst())
+                return true;
             int count = cursor.getInt(0);
-            if (count < MAX_ENTRIES) return true;
+            if (count < MAX_ENTRIES)
+                return true;
             return !cursor.isNull(1) && score > cursor.getInt(1);
         }
     }
@@ -67,7 +70,8 @@ public class ScoreDatabaseHelper extends SQLiteOpenHelper {
     // Insert only if eligible, then remove entries ranked below 25th.
     public boolean insertIfQualified(String playerName, int score) {
         String cleaned = playerName == null ? "" : playerName.trim();
-        if (cleaned.isEmpty() || cleaned.length() > 20 || score < 0) return false;
+        if (cleaned.isEmpty() || cleaned.length() > 20 || score < 0)
+            return false;
 
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
@@ -80,14 +84,16 @@ public class ScoreDatabaseHelper extends SQLiteOpenHelper {
             values.put("player_name", cleaned);
             values.put("score", score);
             values.put("created_at", System.currentTimeMillis());
-            if (db.insertOrThrow(TABLE, null, values) < 0) return false;
+            if (db.insertOrThrow(TABLE, null, values) < 0)
+                return false;
 
             db.execSQL("DELETE FROM " + TABLE + " WHERE _id NOT IN ("
                     + "SELECT _id FROM " + TABLE
                     + " ORDER BY score DESC, _id ASC LIMIT " + MAX_ENTRIES + ")");
             db.setTransactionSuccessful();
             return true;
-        } finally {
+        }
+        finally {
             db.endTransaction();
         }
     }

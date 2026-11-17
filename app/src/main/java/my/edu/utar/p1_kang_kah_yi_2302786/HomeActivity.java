@@ -51,8 +51,12 @@ public class HomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
         scoreDatabase = new ModeScoreDatabaseHelper(this);
         ScoreDatabaseHelper legacyScores = new ScoreDatabaseHelper(this);
-        try { scoreDatabase.importLegacyScores(legacyScores); }
-        finally { legacyScores.close(); }
+        try {
+            scoreDatabase.importLegacyScores(legacyScores);
+        }
+        finally {
+            legacyScores.close();
+        }
         // Seed only once per mode and preserve previously saved records.
         scoreDatabase.seedInitialSampleScores();
         preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -285,7 +289,9 @@ public class HomeActivity extends AppCompatActivity {
                 // Anchor the graphic to the actual tile position rather than
                 // guessing pixel offsets. This works across screen sizes.
                 demoArea.post(() -> {
-                    if (!demoArea.isAttachedToWindow()) return;
+                    if (!demoArea.isAttachedToWindow())
+                        return;
+
                     Rect targetBounds = new Rect(0, 0,
                             finalTargetTile.getWidth(), finalTargetTile.getHeight());
                     demoArea.offsetDescendantRectToMyCoords(finalTargetTile, targetBounds);
@@ -312,7 +318,8 @@ public class HomeActivity extends AppCompatActivity {
                             .start();
                 });
             }
-        } else if (pageIndex == 1) {
+        }
+        else if (pageIndex == 1) {
             TextView title = label("Score and Time", 18, "#30264D", true);
             title.setGravity(Gravity.CENTER);
             content.addView(title, fullWidth());
@@ -492,7 +499,8 @@ public class HomeActivity extends AppCompatActivity {
         final List<ModeScoreDatabaseHelper.ScoreEntry> scores;
         try {
             scores = scoreDatabase.getTop25(selectedMode);
-        } catch (SQLiteException error) {
+        }
+        catch (SQLiteException error) {
             Toast.makeText(this, "Couldn't load saved scores.", Toast.LENGTH_LONG).show();
             return;
         }
@@ -525,7 +533,8 @@ public class HomeActivity extends AppCompatActivity {
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(8), dp(48), dp(8), dp(48));
             rows.addView(empty, fullWidth());
-        } else {
+        }
+        else {
             for (int i = 0; i < scores.size(); i++) {
                 ModeScoreDatabaseHelper.ScoreEntry entry = scores.get(i);
                 LinearLayout row = new LinearLayout(this);
@@ -711,7 +720,8 @@ public class HomeActivity extends AppCompatActivity {
         view.setText(text);
         view.setTextColor(Color.parseColor(hexColor));
         view.setTextSize(sizeSp);
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        if (bold)
+            view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
     }
 
@@ -719,7 +729,8 @@ public class HomeActivity extends AppCompatActivity {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fill);
         drawable.setCornerRadius(dp(cornerDp));
-        if (stroke != 0) drawable.setStroke(dp(1), stroke);
+        if (stroke != 0)
+            drawable.setStroke(dp(1), stroke);
         return drawable;
     }
 
@@ -730,7 +741,8 @@ public class HomeActivity extends AppCompatActivity {
                 GradientDrawable.Orientation.TL_BR, colors);
         drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setCornerRadius(dp(cornerDp));
-        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        if (strokeColor != 0)
+            drawable.setStroke(dp(1), strokeColor);
         return drawable;
     }
 
@@ -744,7 +756,8 @@ public class HomeActivity extends AppCompatActivity {
         if (activeDialog != null && activeDialog.isShowing()) activeDialog.dismiss();
         activeDialog = dialog;
         dialog.setOnDismissListener(ignored -> {
-            if (activeDialog == dialog) activeDialog = null;
+            if (activeDialog == dialog)
+                activeDialog = null;
         });
         dialog.show();
         Window window = dialog.getWindow();
@@ -775,9 +788,12 @@ public class HomeActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        if (activeDialog != null) activeDialog.dismiss();
-        if (scoreDatabase != null) scoreDatabase.close();
-        if (audioManager != null) audioManager.release();
+        if (activeDialog != null)
+            activeDialog.dismiss();
+        if (scoreDatabase != null)
+            scoreDatabase.close();
+        if (audioManager != null)
+            audioManager.release();
         super.onDestroy();
     }
 }

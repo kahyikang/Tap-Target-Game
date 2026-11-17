@@ -82,7 +82,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
             seedModeOnce(db, GameMode.EASY, easyNames, easyScores);
             seedModeOnce(db, GameMode.HARD, hardNames, hardScores);
             db.setTransactionSuccessful();
-        } finally {
+        }
+        finally {
             db.endTransaction();
         }
     }
@@ -96,14 +97,16 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         try (Cursor flag = db.rawQuery(
                 "SELECT name FROM migration_state WHERE name=?",
                 new String[]{markerName})) {
-            if (flag.moveToFirst()) return;
+            if (flag.moveToFirst())
+                return;
         }
 
         int currentCount = 0;
         try (Cursor countCursor = db.rawQuery(
                 "SELECT COUNT(*) FROM mode_scores WHERE mode=?",
                 new String[]{mode.key()})) {
-            if (countCursor.moveToFirst()) currentCount = countCursor.getInt(0);
+            if (countCursor.moveToFirst())
+                currentCount = countCursor.getInt(0);
         }
         // Do not trim existing records to make room for sample entries.
         int spaces = Math.max(0, LIMIT - currentCount);
@@ -126,7 +129,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         // Do not lock the new database while reading the old database.
         try {
             oldScores = legacy.getTop25();
-        } catch (RuntimeException error) {
+        }
+        catch (RuntimeException error) {
             // Leave the marker unset so the import can be retried later.
             return;
         }
@@ -147,7 +151,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
             marker.put("name", "legacy_to_easy");
             db.insertOrThrow("migration_state", null, marker);
             db.setTransactionSuccessful();
-        } finally {
+        }
+        finally {
             db.endTransaction();
         }
     }
@@ -159,7 +164,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
                 "SELECT name, score FROM mode_scores WHERE mode=? " +
                         "ORDER BY score DESC, id ASC LIMIT 25",
                 new String[]{mode.key()})) {
-            while (c.moveToNext()) result.add(new ScoreEntry(c.getString(0), c.getInt(1)));
+            while (c.moveToNext())
+                result.add(new ScoreEntry(c.getString(0), c.getInt(1)));
         }
         return result;
     }
@@ -174,7 +180,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
                         "ORDER BY score DESC, id ASC LIMIT 1 OFFSET 24",
                 new String[]{mode.key()})) {
             // If fewer than 25 scores exist, any nonnegative score can enter.
-            if (!c.moveToFirst()) return score >= 0;
+            if (!c.moveToFirst())
+                return score >= 0;
             // Earlier scores win ties for the 25th position.
             return score > c.getInt(0);
         }
@@ -183,7 +190,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
     // Validates input, rechecks eligibility, and trims this mode in one transaction.
     public boolean insertIfQualified(String name, int score, GameMode mode) {
         String cleanName = name == null ? "" : name.trim();
-        if (cleanName.isEmpty() || cleanName.length() > 20 || score < 0) return false;
+        if (cleanName.isEmpty() || cleanName.length() > 20 || score < 0)
+            return false;
         SQLiteDatabase db = getWritableDatabase();
         boolean inserted = false;
         db.beginTransaction();
@@ -194,7 +202,8 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
                 inserted = true;
             }
             db.setTransactionSuccessful();
-        } finally {
+        }
+        finally {
             db.endTransaction();
         }
         return inserted;
