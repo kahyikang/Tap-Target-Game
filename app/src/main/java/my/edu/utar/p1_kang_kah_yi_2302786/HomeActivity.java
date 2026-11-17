@@ -31,10 +31,8 @@ import androidx.appcompat.widget.SwitchCompat;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * App launcher. Gameplay is only started after the player presses Play Game.
- * Uses the same persistent SQLite scores and audio preference keys as MainActivity.
- */
+// App launcher. Gameplay is only started after the player presses Play Game.
+// Uses the same persistent SQLite scores and audio preference keys as MainActivity.
 public class HomeActivity extends AppCompatActivity {
 
     private static final String PREFS_NAME = "tap_target_settings";
@@ -47,6 +45,7 @@ public class HomeActivity extends AppCompatActivity {
     private AlertDialog activeDialog;
 
     @Override
+    // Initializes saved scores, menu audio, and the home button actions.
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
@@ -94,7 +93,7 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    /** Graphic multi-page instructions; available without starting or interrupting a game. */
+    // Graphic multi-page instructions; available without starting or interrupting a game.
     private void showHowToPlayDialog() {
         LinearLayout card = dialogCard();
         card.setPadding(dp(18), dp(18), dp(18), dp(18));
@@ -212,6 +211,7 @@ public class HomeActivity extends AppCompatActivity {
         displayDialog(dialog);
     }
 
+    // Builds the current guide page, including a tappable demonstration on page one.
     private void renderGuidePage(LinearLayout content, int pageIndex) {
         if (pageIndex == 0) {
             TextView title = label("Find the Different Tile", 18, "#30264D", true);
@@ -298,6 +298,7 @@ public class HomeActivity extends AppCompatActivity {
                 });
 
                 finalTargetTile.setClickable(true);
+                // Demonstrate tap feedback without changing the real game score.
                 finalTargetTile.setOnClickListener(v -> {
                     audioManager.playCorrectTap();
                     finalTargetTile.setScaleX(0.92f);
@@ -354,7 +355,8 @@ public class HomeActivity extends AppCompatActivity {
             LinearLayout.LayoutParams barFillParams = new LinearLayout.LayoutParams(dp(120), dp(10));
             barFillParams.topMargin = dp(-10);
             timerCard.addView(barFill, barFillParams);
-        } else if (pageIndex == 2) {
+        }
+        else if (pageIndex == 2) {
             TextView pill = label("Easy Mode", 16, "#365B82", true);
             pill.setGravity(Gravity.CENTER);
             pill.setPadding(dp(14), dp(9), dp(14), dp(9));
@@ -373,7 +375,8 @@ public class HomeActivity extends AppCompatActivity {
             LinearLayout.LayoutParams rowParams4 = fullWidth();
             rowParams4.topMargin = dp(10);
             content.addView(featureRow("0", "Wrong tap: no penalty", "#47A17C"), rowParams4);
-        } else {
+        }
+        else {
             TextView pill = label("Hard Mode", 16, "#7858C8", true);
             pill.setGravity(Gravity.CENTER);
             pill.setPadding(dp(14), dp(9), dp(14), dp(9));
@@ -434,7 +437,7 @@ public class HomeActivity extends AppCompatActivity {
         return row;
     }
 
-    /** Choose a mode before gameplay; the mode stays selected for this entire run. */
+    // Choose a mode before gameplay; the mode stays selected for this entire run.
     private void showModeSelectionDialog() {
         LinearLayout card = dialogCard();
         TextView title = label("SELECT GAME MODE", 22, "#30264D", true);
@@ -472,6 +475,7 @@ public class HomeActivity extends AppCompatActivity {
         return choice;
     }
 
+    // Passes the stable mode key through an Intent to the game activity.
     private void startChosenMode(AlertDialog dialog, GameMode mode) {
         audioManager.playButtonClick();
         dialog.dismiss();
@@ -480,9 +484,10 @@ public class HomeActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    /** Builds a scrollable Top 25 table for the selected mode. */
+    // Builds a scrollable Top 25 table for the selected mode.
     private void showLeaderboardDialog() { showLeaderboardDialog(GameMode.EASY); }
 
+    // Reads the selected mode scores and builds the ranking rows.
     private void showLeaderboardDialog(GameMode selectedMode) {
         final List<ModeScoreDatabaseHelper.ScoreEntry> scores;
         try {
@@ -593,7 +598,8 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
-    /** Preferences directly control live audio playback. */
+    // Preferences directly control live audio playback.
+    // Shows independent music and sound-effect preferences.
     private void showSettingsDialog() {
         LinearLayout card = dialogCard();
         // Compact padding for Settings only (does not affect the Leaderboard).

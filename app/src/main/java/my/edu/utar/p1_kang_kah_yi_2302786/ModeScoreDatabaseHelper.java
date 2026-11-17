@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Independent Top-25 boards for each mode, stored persistently on the device. */
+// Independent Top-25 boards for each mode, stored persistently on the device.
 public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
     // A NEW database, so the original ScoreDatabaseHelper database is never altered.
     private static final String DB_NAME = "tap_target_mode_scores.db";
@@ -30,6 +30,7 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         super(context, DB_NAME, null, DB_VERSION);
     }
 
+    // Creates mode-tagged scores, a ranking index, and one-time migration markers.
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS mode_scores (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -45,13 +46,10 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         // Reserved for future non-destructive schema upgrades.
     }
 
-    /**
-     * Populate up to 25 example entries per mode, without overwriting or deleting
-     * previously saved player scores. A durable marker prevents reseeding even when
-     * sample entries later fall out of the Top 25.
-     *
-     * Call this after importLegacyScores(), so legacy user scores take priority.
-     */
+    // Populate up to 25 example entries per mode, without overwriting or deleting
+    // previously saved player scores. A durable marker prevents reseeding even when
+    // sample entries later fall out of the Top 25.
+    // Call this after importLegacyScores(), so legacy user scores take priority.
     public void seedInitialSampleScores() {
         final String[] easyNames = {
                 "Alex", "Bella", "Casey", "Dylan", "Eden",
@@ -119,11 +117,9 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-    /**
-     * Copy existing pre-mode scores into Easy exactly once.
-     * The original database is not modified or deleted. An empty legacy board
-     * is also marked migrated, avoiding unwanted future duplicate imports.
-     */
+    // Copy existing pre-mode scores into Easy exactly once.
+    // The original database is not modified or deleted. An empty legacy board
+    // is also marked migrated, avoiding unwanted future duplicate imports.
     public void importLegacyScores(ScoreDatabaseHelper legacy) {
         SQLiteDatabase db = getWritableDatabase();
         List<ScoreDatabaseHelper.ScoreEntry> oldScores;
@@ -156,6 +152,7 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    // Filters by mode and ranks equal scores by their earlier insertion ID.
     public List<ScoreEntry> getTop25(GameMode mode) {
         List<ScoreEntry> result = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
@@ -183,6 +180,7 @@ public class ModeScoreDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    // Validates input, rechecks eligibility, and trims this mode in one transaction.
     public boolean insertIfQualified(String name, int score, GameMode mode) {
         String cleanName = name == null ? "" : name.trim();
         if (cleanName.isEmpty() || cleanName.length() > 20 || score < 0) return false;

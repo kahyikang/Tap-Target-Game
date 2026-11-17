@@ -5,6 +5,7 @@
     android:fillViewport="true"
     android:background="@drawable/bg_home_gradient">
 
+    <!-- Centered home content stays scrollable on smaller screens. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

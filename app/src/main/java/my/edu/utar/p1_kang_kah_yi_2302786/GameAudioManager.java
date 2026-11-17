@@ -7,11 +7,9 @@ import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.util.Log;
 
-/**
- * Two separate looping soundtracks: one for menus/results and one for gameplay.
- * Sound effects (including all button clicks) follow the existing SFX switch.
- * Audio is bundled locally in res/raw, with no internet or storage permission.
- */
+// Two separate looping soundtracks: one for menus/results and one for gameplay.
+// Sound effects (including all button clicks) follow the existing SFX switch.
+// Audio is bundled locally in res/raw, with no internet or storage permission.
 public final class GameAudioManager {
 
     public enum MusicMode { MENU, GAME }
@@ -37,6 +35,7 @@ public final class GameAudioManager {
     private boolean foreground = false;
     private boolean musicActive = false;
 
+    // Loads looping music and short effects using the application context.
     public GameAudioManager(Context context) {
         Context appContext = context.getApplicationContext();
         preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -50,7 +49,7 @@ public final class GameAudioManager {
             gameMusic = MediaPlayer.create(appContext, R.raw.game_loop);
             if (gameMusic != null) {
                 gameMusic.setLooping(true);
-                // Keep the competitive track below the tap sound effects.
+                // Both music tracks use full player volume.
                 gameMusic.setVolume(1, 1);
             }
         } catch (RuntimeException e) {
@@ -90,23 +89,24 @@ public final class GameAudioManager {
         updateMusic();
     }
 
-    /** Set the desired soundtrack; never allows both tracks to play together. */
+    // Set the desired soundtrack; never allows both tracks to play together.
     public void setMusicMode(MusicMode mode) {
         musicMode = mode;
         updateMusic();
     }
 
-    /** Pauses music during the 3-2-1 intro, pauses, and between levels. */
+    // Pauses music during the 3-2-1 intro, pauses, and between levels.
     public void setMusicActive(boolean active) {
         musicActive = active;
         updateMusic();
     }
 
-    /** Respond immediately when the user changes Music in either Settings screen. */
+    // Respond immediately when the user changes Music in either Settings screen.
     public void refreshPreferences() {
         updateMusic();
     }
 
+    // Plays music only when the activity, game state, and saved preference allow it.
     private void updateMusic() {
         boolean enabled = foreground && musicActive &&
                 preferences.getBoolean(PREF_MUSIC, true);
@@ -128,20 +128,34 @@ public final class GameAudioManager {
     }
 
     // Independent sound effects: available even when background music is muted.
-    public void playCorrectTap()      { playSound(correctSoundId, 1); }
-    public void playWrongTap()        { playSound(wrongSoundId, 1); }
-    public void playLevelComplete()   { playSound(levelSoundId, 1); }
-    public void playCountdownBeep()   { playSound(countdownBeepId, 1); }
-    public void playCountdownGo()     { playSound(countdownGoId, 1); }
-    public void playCongratulations() { playSound(congratulationsId, 1); }
-    public void playButtonClick()     { playSound(buttonClickId, 1); }
+    public void playCorrectTap() {
+        playSound(correctSoundId, 1);
+    }
+    public void playWrongTap() {
+        playSound(wrongSoundId, 1);
+    }
+    public void playLevelComplete() {
+        playSound(levelSoundId, 1);
+    }
+    public void playCountdownBeep() {
+        playSound(countdownBeepId, 1);
+    }
+    public void playCountdownGo() {
+        playSound(countdownGoId, 1);
+    }
+    public void playCongratulations() { playSound(congratulationsId, 1);
+    }
+    public void playButtonClick() { playSound(buttonClickId, 1);
+    }
 
+    // Checks the sound setting on each request so changes apply immediately.
     private void playSound(int id, float volume) {
         if (!foreground || soundPool == null || id == 0 ||
                 !preferences.getBoolean(PREF_SFX, true)) return;
         soundPool.play(id, volume, volume, 1, 0, 1f);
     }
 
+    // Releases native audio resources when the owning activity is destroyed.
     public void release() {
         foreground = false;
         musicActive = false;

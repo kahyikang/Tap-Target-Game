@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
+// Controls the timed game, level transitions, and final score dialogs.
 public class MainActivity extends AppCompatActivity {
 
     // One color pair is picked at random whenever a level starts.
@@ -71,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
             80f, 70f, 59f, 49f, 39f, 31f, 23f, 15f
     };
 
-    /** Keep each selected color pair's hue direction but normalize the difference. */
+    // Keep each selected color pair's hue direction but normalize the difference.
     private static int targetWithDistance(ColorPair source, float distance) {
         int r = Color.red(source.normalColor);
         int g = Color.green(source.normalColor);
@@ -277,12 +278,14 @@ public class MainActivity extends AppCompatActivity {
         startNewGame();
     }
 
+    // Resets the total score and begins a fresh eight-level run.
     private void startNewGame() {
         totalScore = 0;
         qualifiedAtFinish = null;
         startLevel(0);
     }
 
+    // Prepares the level rules, then waits for the board to be measured.
     private void startLevel(int newIndex) {
         stopIntroCountdown();
         stopCountdown();
@@ -396,6 +399,7 @@ public class MainActivity extends AppCompatActivity {
         if (introNumber != null) introNumber.animate().cancel();
     }
 
+    // Builds a square grid sized to fit the available board space.
     private void createGrid(int size) {
         tiles.clear();
         gameGrid.removeAllViews();
@@ -436,6 +440,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Accepts taps only during live play and applies the selected mode rules.
     private void handleTileTap(int index) {
         if (state != GameState.PLAYING || !countdownStarted) return;
         if (SystemClock.elapsedRealtime() >= deadlineMs) {
@@ -479,7 +484,7 @@ public class MainActivity extends AppCompatActivity {
                 .start();
     }
 
-    // Subtle feedback on the large score number after each correct tap.
+    // Score feedback also runs when Hard Mode deducts a point.
     private void animateScore() {
         scoreText.animate().cancel();
         scoreText.setScaleX(1.12f);
@@ -488,6 +493,7 @@ public class MainActivity extends AppCompatActivity {
                 .setDuration(170L).start();
     }
 
+    // Chooses one target uniformly; the previous target may be chosen again.
     private void highlightRandomTile() {
         if (tiles.isEmpty()) return;
         highlightedIndex = random.nextInt(tiles.size());
@@ -512,6 +518,7 @@ public class MainActivity extends AppCompatActivity {
         return background;
     }
 
+    // Uses an elapsed-time deadline so delayed timer callbacks do not extend play.
     private void startCountdown() {
         if (timeRemainingMs <= 0L) {
             completeLevel();
@@ -545,6 +552,7 @@ public class MainActivity extends AppCompatActivity {
         countdownStarted = false;
     }
 
+    // Stores the exact remaining time before cancelling timer callbacks.
     private void pauseLevel() {
         if (state != GameState.PLAYING || !countdownStarted) return;
         timeRemainingMs = Math.max(0L, deadlineMs - SystemClock.elapsedRealtime());
@@ -561,6 +569,7 @@ public class MainActivity extends AppCompatActivity {
         showPauseDialog();
     }
 
+    // Restarts the timer using the saved time and keeps the current grid.
     private void resumeLevel() {
         if (state != GameState.PAUSED) return;
         state = GameState.PLAYING;
@@ -582,6 +591,7 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+    // Ends timed play and chooses automatic or player-controlled progression.
     private void completeLevel() {
         if (state != GameState.PLAYING) return;
         stopCountdown();
@@ -644,6 +654,7 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+    // Stops play and checks whether the final score qualifies for this mode.
     private void endGame() {
         stopCountdown();
         state = GameState.GAME_OVER;
@@ -689,6 +700,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Validates the player name and saves only if the score still qualifies.
     private void showNameEntryDialog() {
         if (isFinishing() || isDestroyed()) return;
         LinearLayout card = new LinearLayout(this);
@@ -770,6 +782,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showLeaderboardDialog() { showLeaderboardDialog(gameMode); }
 
+    // Loads and displays the selected mode leaderboard.
     private void showLeaderboardDialog(GameMode selectedMode) {
         if (isFinishing() || isDestroyed()) return;
         final List<ModeScoreDatabaseHelper.ScoreEntry> entries;
@@ -876,7 +889,7 @@ public class MainActivity extends AppCompatActivity {
         displayDialog(dialog);
     }
 
-    /** Both boards are visible, but only one board's scores are shown at a time. */
+    // Both boards are visible, but only one board's scores are shown at a time.
     private void addLeaderboardTabs(LinearLayout card, GameMode selectedMode) {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
@@ -1288,6 +1301,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    // Stops audio and freezes active gameplay when the activity leaves the foreground.
     protected void onPause() {
         audioManager.onPause();
         if (state == GameState.INTRO) {
@@ -1307,6 +1321,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    // Restarts an interrupted intro or asks the player to resume paused gameplay.
     protected void onResume() {
         super.onResume();
         audioManager.onResume();
