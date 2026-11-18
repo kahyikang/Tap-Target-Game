@@ -476,7 +476,7 @@ public class MainActivity extends AppCompatActivity {
         animateCorrectTap(tiles.get(index));
         updateHeader();
         animateScore();
-        highlightRandomTile(); // Repeating the same target is allowed.
+        highlightRandomTile(); // Move the highlight to a different tile.
     }
 
     // Tiny press effect without changing the tile color or showing a symbol.
@@ -500,11 +500,18 @@ public class MainActivity extends AppCompatActivity {
                 .setDuration(170L).start();
     }
 
-    // Chooses one target uniformly; the previous target may be chosen again.
+    // The old target stays in the grid but returns to its normal colour.
+    // Choose a different tile for the next highlight.
     private void highlightRandomTile() {
         if (tiles.isEmpty())
             return;
-        highlightedIndex = random.nextInt(tiles.size());
+
+        int previousIndex = highlightedIndex;
+        int newIndex;
+        do {
+            newIndex = random.nextInt(tiles.size());
+        } while (tiles.size() > 1 && newIndex == previousIndex);
+        highlightedIndex = newIndex;
 
         for (int index = 0; index < tiles.size(); index++) {
             boolean active = index == highlightedIndex;
